@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-const Webcam = dynamic(() => import("react-webcam"), { ssr: false });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Webcam: any = dynamic((() => import("react-webcam")) as any, { ssr: false });
 
 interface CameraModuleProps {
   prompt: string;
@@ -46,6 +47,7 @@ export function CameraModule({ prompt, onCapture, uploading }: CameraModuleProps
       <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50">
         <span className="absolute left-3 top-2 text-lg">✨</span>
         <span className="absolute right-3 top-2 text-lg">🌼</span>
+
         <Webcam
           ref={webcamRef}
           audio={false}

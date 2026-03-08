@@ -16,22 +16,28 @@
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
+    "cloudinary": "^2.9.0",
     "expo": "~53.0.0",
     "expo-camera": "~16.0.7",
     "expo-location": "~18.0.7",
     "expo-notifications": "~0.31.4",
     "expo-status-bar": "~2.2.3",
+    "mongoose": "^9.2.4",
+    "next-auth": "^4.24.13",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.5",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-web": "^0.20.0",
+    "react-webcam": "^7.2.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",
+    "@tailwindcss/postcss": "^4.2.1",
     "@types/react": "~19.0.12",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5.8.2"
   }
 }
