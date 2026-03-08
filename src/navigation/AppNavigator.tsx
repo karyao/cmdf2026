@@ -5,6 +5,7 @@ import { RootStackParamList, RootTabParamList } from "./types";
 
 import { EventDetailsScreen } from "../screens/EventDetailsScreen";
 import { LobbyScreen } from "../screens/LobbyScreen";
+import { LoginScreen } from "../screens/LoginScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { TimelineScreen } from "../screens/TimelineScreen";
 import { WrappedScreen } from "../screens/WrappedScreen";
@@ -71,7 +72,8 @@ const styles = StyleSheet.create({
 
 export function AppNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator initialRouteName="Login">
+      <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen name="EventDetails" component={EventDetailsScreen} options={{ title: "Event Details" }} />
     </Stack.Navigator>

@@ -6,6 +6,7 @@ export type RootTabParamList = {
 };
 
 export type RootStackParamList = {
+  Login: undefined;
   MainTabs: undefined;
   EventDetails: { eventId: string };
 };
