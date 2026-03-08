@@ -15,6 +15,9 @@ web-build/
 # metro
 .metro-health-check*
 
+# next.js
+.next/
+
 # env
 .env.local
 .env*.local
