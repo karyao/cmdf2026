@@ -6,12 +6,13 @@ import { Video } from "@/lib/models/Video";
 import { User } from "@/lib/models/User";
 import { execFile } from "child_process";
 import path from "path";
+import fs from "fs/promises";
 
 const FRAMES_PER_PHOTO = 90;
 const INTRO_FRAMES = 90;
 const OUTRO_FRAMES = 90;
 const FPS = 30;
-const SAMPLE_MEMBER_IMAGES = [
+const DEFAULT_SAMPLE_MEMBER_IMAGES = [
   "/images/IMG_1450.jpeg",
   "/images/IMG_1240.jpeg",
   "/images/IMG_1485.jpeg",
@@ -25,6 +26,24 @@ const SAMPLE_MEMBER_IMAGES = [
 ];
 const DUMMY_MEMBER_NAMES = ["Alex", "Jordan", "Morgan", "Taylor", "Megan", "Noah"];
 const FORCED_SAMPLE_NAMES = ["Jordan", "Megan"];
+const DEMO_EVENT_TITLE = "Midnight Moodboard Club";
+const MIN_DEMO_SLIDES = 10;
+
+async function getPublicImagePool() {
+  try {
+    const imagesDir = path.join(process.cwd(), "public", "images");
+    const files = await fs.readdir(imagesDir);
+    const allowedExt = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+    const imagePaths = files
+      .filter((file) => allowedExt.has(path.extname(file).toLowerCase()))
+      .sort((a, b) => a.localeCompare(b))
+      .map((file) => `/images/${file}`);
+
+    return imagePaths.length ? imagePaths : DEFAULT_SAMPLE_MEMBER_IMAGES;
+  } catch {
+    return DEFAULT_SAMPLE_MEMBER_IMAGES;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +78,9 @@ export async function POST(request: NextRequest) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+    const eventTitle = (event as any).title || "";
+    const sampleMemberImages =
+      eventTitle === DEMO_EVENT_TITLE ? await getPublicImagePool() : DEFAULT_SAMPLE_MEMBER_IMAGES;
 
     const requestingUserId = String(userId || "000000000000000000000001");
     const memberIds = ((event as any).members ?? []).map((m: any) => String(m));
@@ -101,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     for (const memberId of memberIds) {
       if (existingPhotoOwnerIds.has(memberId)) continue;
-      const samplePath = SAMPLE_MEMBER_IMAGES[sampleIdx % SAMPLE_MEMBER_IMAGES.length];
+      const samplePath = sampleMemberImages[sampleIdx % sampleMemberImages.length];
       sampleIdx += 1;
       photoSlides.push({
         url: `${baseUrl}${samplePath}`,
@@ -119,7 +141,7 @@ export async function POST(request: NextRequest) {
       ? new Date((photos as any[])[photos.length - 1].timestamp).getTime()
       : new Date((event as any).createdAt ?? Date.now()).getTime();
     const forcedSampleSlides = FORCED_SAMPLE_NAMES.map((name, idx) => {
-      const samplePath = SAMPLE_MEMBER_IMAGES[(sampleIdx + idx) % SAMPLE_MEMBER_IMAGES.length];
+      const samplePath = sampleMemberImages[(sampleIdx + idx) % sampleMemberImages.length];
       return {
         url: `${baseUrl}${samplePath}`,
         participantId: `dummy-${idx}`,
@@ -131,6 +153,30 @@ export async function POST(request: NextRequest) {
     });
     sampleIdx += forcedSampleSlides.length;
     photoSlides.push(...forcedSampleSlides);
+
+    // For the demo event, append the full public/images pool so recap feels rich.
+    // This keeps real captured photos and adds all pool images after them.
+    if (eventTitle === DEMO_EVENT_TITLE) {
+      const existingUrls = new Set(photoSlides.map((slide) => slide.url));
+      const demoPoolSlides = sampleMemberImages
+        .map((samplePath, idx) => {
+          const slideUrl = `${baseUrl}${samplePath}`;
+          return {
+            url: slideUrl,
+            participantId: idx % 4 === 0 ? requestingUserId : `demo-pool-${idx}`,
+            participantName:
+              idx % 4 === 0
+                ? "You"
+                : DUMMY_MEMBER_NAMES[idx % DUMMY_MEMBER_NAMES.length],
+            timestamp: new Date(baseTs + (idx + 1) * 45_000).toISOString(),
+            width: null,
+            height: null
+          };
+        })
+        .filter((slide) => !existingUrls.has(slide.url));
+
+      photoSlides.push(...demoPoolSlides);
+    }
 
     const firstUserSlide = photoSlides.find((slide) => slide.participantName === "You") ?? photoSlides[0];
     const preferredHead = [firstUserSlide, ...forcedSampleSlides].filter(Boolean);
@@ -149,6 +195,26 @@ export async function POST(request: NextRequest) {
       if (seenKeys.has(key)) continue;
       seenKeys.add(key);
       orderedPhotoSlides.push(slide);
+    }
+
+    // Ensure demo recaps have enough volume for consistent presentations.
+    if (eventTitle === DEMO_EVENT_TITLE && orderedPhotoSlides.length < MIN_DEMO_SLIDES) {
+      const basePadTs = orderedPhotoSlides.length
+        ? new Date(orderedPhotoSlides[orderedPhotoSlides.length - 1].timestamp).getTime()
+        : baseTs;
+      let padIdx = 0;
+      while (orderedPhotoSlides.length < MIN_DEMO_SLIDES) {
+        const samplePath = sampleMemberImages[padIdx % sampleMemberImages.length];
+        orderedPhotoSlides.push({
+          url: `${baseUrl}${samplePath}`,
+          participantId: padIdx % 3 === 0 ? requestingUserId : `demo-pad-${padIdx}`,
+          participantName: padIdx % 3 === 0 ? "You" : DUMMY_MEMBER_NAMES[padIdx % DUMMY_MEMBER_NAMES.length],
+          timestamp: new Date(basePadTs + (padIdx + 1) * 30_000).toISOString(),
+          width: null,
+          height: null
+        });
+        padIdx += 1;
+      }
     }
 
     // Compute Wrapped stats

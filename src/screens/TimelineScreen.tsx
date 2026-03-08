@@ -8,10 +8,46 @@ import { AvatarStack } from "../components/AvatarStack";
 import { DEMO_USER_ID, apiUrl } from "../lib/api";
 
 const LEGACY_DEFAULT_PROMPT = "Show your current moment.";
+const DEMO_TIMELINE_IMAGES = [
+  "/images/IMG_1450.jpeg",
+  "/images/IMG_1240.jpeg",
+  "/images/IMG_1485.jpeg",
+  "/images/IMG_0555.jpeg",
+  "/images/IMG_0559.jpeg",
+  "/images/IMG_0565.jpeg",
+  "/images/IMG_0540.jpeg",
+  "/images/IMG_1644.jpeg",
+  "/images/IMG_1501.jpeg",
+  "/images/IMG_1235.jpeg"
+];
+const DEMO_TIMELINE_PROMPTS = [
+  "Caught the coziest corner in the room",
+  "Golden hour hit just right",
+  "Study setup check-in",
+  "A tiny detail I almost missed",
+  "Current mood in one frame",
+  "Something warm and calming",
+  "View from my seat right now",
+  "Lowkey proud of this shot",
+  "What focus looks like today",
+  "A little candid from this moment"
+];
 
 export function TimelineScreen() {
   const { activeEvent } = useEventStore();
   const [photos, setPhotos] = useState<any[]>([]);
+  const demoPhotos = useMemo(() => {
+    const shuffled = [...DEMO_TIMELINE_IMAGES].sort(() => Math.random() - 0.5).slice(0, 5);
+    const promptPool = [...DEMO_TIMELINE_PROMPTS].sort(() => Math.random() - 0.5);
+    const now = Date.now();
+    return shuffled.map((path, index) => ({
+      _id: `demo-photo-${index}`,
+      media_url: apiUrl(path),
+      timestamp: new Date(now - (Math.floor(Math.random() * 8) + index + 1) * 35 * 60 * 1000).toISOString(),
+      prompt: promptPool[index % promptPool.length],
+      caption: promptPool[index % promptPool.length]
+    }));
+  }, []);
 
   const pendingSlots = useMemo(
     () => activeEvent.slots.filter((slot) => slot.status !== "submitted"),
@@ -29,7 +65,10 @@ export function TimelineScreen() {
         return (mediaUrl.includes("/uploads/") || mediaUrl.startsWith("data:image")) && mediaUrl.length > 10;
       });
 
-      setPhotos(filtered);
+      const combined = [...filtered, ...demoPhotos].sort(
+        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+      setPhotos(combined);
     } catch (err) {
       console.error("Failed to fetch photos:", err);
     }
@@ -41,7 +80,7 @@ export function TimelineScreen() {
       void fetchPhotos();
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [demoPhotos]);
 
   const handleDeleteAll = async () => {
     try {
