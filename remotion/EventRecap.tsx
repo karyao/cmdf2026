@@ -487,6 +487,9 @@ export const EventRecap: React.FC<EventRecapProps> = ({
       const groupTime = new Date(d);
       groupTime.setMinutes(0, 0, 0);
       hourMap[k] = { timestamp: groupTime.toISOString(), photos: [] };
+    }
+    hourMap[k].photos.push(photo);
+  }
   // Define actual members to slot ratio. If allMembers isn't passed, fallback to 1 member to prevent crashing.
   const membersList = allMembers && allMembers.length > 0 ? allMembers : [{ _id: "unknown", name: "Member" }];
 
