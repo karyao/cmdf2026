@@ -321,111 +321,121 @@ export function LobbyScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             {activeEvent ? (
-              <>
-                <Text style={styles.modalTitle}>{activeEvent.title}</Text>
-                <Text style={styles.meta}>{activeEvent.city} • Every {activeEvent.intervalMinutes} min</Text>
+              <View style={styles.modalLayout}>
+                <ScrollView
+                  style={styles.modalMain}
+                  contentContainerStyle={styles.modalMainContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text style={styles.modalTitle}>{activeEvent.title}</Text>
+                  <Text style={styles.meta}>{activeEvent.city} • Every {activeEvent.intervalMinutes} min</Text>
 
-                {loadingPhotos ? (
-                  <ActivityIndicator style={{ marginTop: 20 }} color={theme.colors.text} />
-                ) : (
-                  <View style={styles.gridWrapper}>
-                    <LobbyGrid
-                      members={activeMembers}
-                      containerHeight={520}
-                      isJoined={activeEvent.joined}
-                      currentUserId={DEMO_USER_ID}
-                      eventPhotos={eventPhotos}
-                      cameraRef={cameraRef}
-                      capturedUri={capturedUri}
-                      capturedWithFrontCamera={capturedWithFrontCamera}
-                      isCapturing={isCapturing}
-                      cameraPermission={permission}
-                      facing={facing}
-                      onRequestPermission={requestPermission}
-                      onCapture={handleCapture}
-                      onRetake={handleRetake}
-                      onFlip={handleFlip}
-                    />
-                  </View>
-                )}
+                  {loadingPhotos ? (
+                    <ActivityIndicator style={{ marginTop: 20 }} color={theme.colors.text} />
+                  ) : (
+                    <View style={styles.gridWrapper}>
+                      <LobbyGrid
+                        members={activeMembers}
+                        containerHeight={520}
+                        isJoined={activeEvent.joined}
+                        currentUserId={DEMO_USER_ID}
+                        eventPhotos={eventPhotos}
+                        cameraRef={cameraRef}
+                        capturedUri={capturedUri}
+                        capturedWithFrontCamera={capturedWithFrontCamera}
+                        isCapturing={isCapturing}
+                        cameraPermission={permission}
+                        facing={facing}
+                        onRequestPermission={requestPermission}
+                        onCapture={handleCapture}
+                        onRetake={handleRetake}
+                        onFlip={handleFlip}
+                      />
+                    </View>
+                  )}
 
-                <Text style={styles.modalBody}>{activeEvent.memberCount} people joined this event.</Text>
-                {activeEvent.joined ? (
-                  <View style={styles.captionWrap}>
-                    <Text style={styles.captionLabel}>Add a description</Text>
-                    <TextInput
-                      value={description}
-                      onChangeText={setDescription}
-                      placeholder="What is happening in this moment?"
-                      placeholderTextColor="#8b8aa5"
-                      style={styles.captionInput}
-                      multiline
-                      maxLength={180}
-                    />
-                    <Text style={styles.captionHint}>
-                      This description will appear in the timeline when you submit the photo.
-                    </Text>
-                    {capturedUri ? (
-                      <Pressable
-                        onPress={handleSubmit}
-                        disabled={isCapturing}
-                        style={[styles.button, styles.submitPhotoButton]}
-                      >
-                        {isCapturing ? (
-                          <ActivityIndicator color="#ffffff" size="small" />
-                        ) : (
-                          <Text style={styles.joinedButtonText}>Submit Photo + Description</Text>
-                        )}
-                      </Pressable>
-                    ) : null}
-                  </View>
-                ) : null}
+                  <Text style={styles.modalBody}>{activeEvent.memberCount} people joined this event.</Text>
+                  {videoMessage ? (
+                    <Text style={styles.videoMessage}>{videoMessage}</Text>
+                  ) : null}
+                </ScrollView>
 
-                {activeEvent.joined && (
-                  <Pressable
-                    onPress={handleGenerateRecap}
-                    disabled={isGeneratingVideo}
-                    style={[styles.button, styles.recapButton]}
-                  >
-                    <Text style={styles.recapButtonText}>
-                      {isGeneratingVideo ? "🎬 Rendering..." : "🎬 Generate Recap Video"}
-                    </Text>
+                <View style={styles.actionRail}>
+                  {activeEvent.joined ? (
+                    <View style={styles.captionWrap}>
+                      <Text style={styles.captionLabel}>Description</Text>
+                      <TextInput
+                        value={description}
+                        onChangeText={setDescription}
+                        placeholder="What is happening in this moment?"
+                        placeholderTextColor="#8b8aa5"
+                        style={styles.captionInput}
+                        multiline
+                        maxLength={180}
+                      />
+                      <Text style={styles.captionHint}>
+                        Appears in the timeline after submit.
+                      </Text>
+                      {capturedUri ? (
+                        <Pressable
+                          onPress={handleSubmit}
+                          disabled={isCapturing}
+                          style={[styles.button, styles.railButton, styles.submitPhotoButton]}
+                        >
+                          {isCapturing ? (
+                            <ActivityIndicator color="#ffffff" size="small" />
+                          ) : (
+                            <Text style={styles.joinedButtonText}>Submit Photo</Text>
+                          )}
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  {activeEvent.joined && (
+                    <Pressable
+                      onPress={handleGenerateRecap}
+                      disabled={isGeneratingVideo}
+                      style={[styles.button, styles.railButton, styles.recapButton]}
+                    >
+                      <Text style={styles.recapButtonText}>
+                        {isGeneratingVideo ? "Rendering..." : "Generate Recap"}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {activeEvent.joined ? (
+                    <Pressable
+                      onPress={() => toggleMembership(activeEvent)}
+                      disabled={updatingId === activeEvent._id}
+                      style={[styles.button, styles.railButton, styles.leaveButton]}
+                    >
+                      {updatingId === activeEvent._id ? (
+                        <ActivityIndicator color="#ffffff" size="small" />
+                      ) : (
+                        <Text style={styles.joinedButtonText}>Unjoin</Text>
+                      )}
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={() => toggleMembership(activeEvent)}
+                      disabled={updatingId === activeEvent._id}
+                      style={[styles.button, styles.railButton, styles.joinedButton]}
+                    >
+                      {updatingId === activeEvent._id ? (
+                        <ActivityIndicator color="#ffffff" size="small" />
+                      ) : (
+                        <Text style={styles.joinedButtonText}>Join</Text>
+                      )}
+                    </Pressable>
+                  )}
+
+                  <Pressable onPress={closeModal} style={[styles.button, styles.railButton, styles.closeButton]}>
+                    <Text style={styles.buttonText}>Close</Text>
                   </Pressable>
-                )}
-                {videoMessage ? (
-                  <Text style={styles.videoMessage}>{videoMessage}</Text>
-                ) : null}
-
-                {activeEvent.joined ? (
-                  <Pressable
-                    onPress={() => toggleMembership(activeEvent)}
-                    disabled={updatingId === activeEvent._id}
-                    style={[styles.button, styles.leaveButton]}
-                  >
-                    {updatingId === activeEvent._id ? (
-                      <ActivityIndicator color="#ffffff" size="small" />
-                    ) : (
-                      <Text style={styles.joinedButtonText}>Unjoin Event</Text>
-                    )}
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    onPress={() => toggleMembership(activeEvent)}
-                    disabled={updatingId === activeEvent._id}
-                    style={[styles.button, styles.joinedButton]}
-                  >
-                    {updatingId === activeEvent._id ? (
-                      <ActivityIndicator color="#ffffff" size="small" />
-                    ) : (
-                      <Text style={styles.joinedButtonText}>Join Event</Text>
-                    )}
-                  </Pressable>
-                )}
-              </>
+                </View>
+              </View>
             ) : null}
-            <Pressable onPress={closeModal} style={[styles.button, styles.closeButton]}>
-              <Text style={styles.buttonText}>Close</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -550,12 +560,37 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 520,
+    maxHeight: "92%",
     alignSelf: "center",
     borderRadius: theme.radius.xl,
     borderWidth: 2,
     borderColor: theme.colors.text,
     backgroundColor: theme.colors.surface,
     padding: 16
+  },
+  modalLayout: {
+    flexDirection: "row",
+    alignItems: "flex-start"
+  },
+  modalMain: {
+    flex: 1,
+    minWidth: 0
+  },
+  modalMainContent: {
+    paddingBottom: 4
+  },
+  actionRail: {
+    width: 122,
+    marginLeft: 10,
+    gap: 8
+  },
+  railButton: {
+    marginTop: 0,
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 8
   },
   modalTitle: {
     fontSize: 22,
@@ -567,7 +602,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text
   },
   captionWrap: {
-    marginTop: 10,
+    marginTop: 0,
     gap: 6
   },
   captionLabel: {
@@ -576,14 +611,15 @@ const styles = StyleSheet.create({
     color: theme.colors.text
   },
   captionInput: {
-    minHeight: 56,
+    minHeight: 74,
     borderWidth: 2,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.md,
     backgroundColor: "#fff",
     color: theme.colors.text,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 12,
     textAlignVertical: "top"
   },
   captionHint: {
@@ -619,7 +655,8 @@ const styles = StyleSheet.create({
   recapButtonText: {
     color: "#ffffff",
     fontWeight: "800",
-    fontSize: 14,
+    fontSize: 12,
+    textAlign: "center"
   },
   videoMessage: {
     marginTop: 8,
