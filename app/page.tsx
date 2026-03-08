@@ -17,11 +17,21 @@ export default function HomePage() {
   const loadPhotos = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/photos", { cache: "no-store" });
+      const response = await fetch("/api/media?type=photo", { cache: "no-store" });
       const payload = await response.json();
-      setPhotos(payload.photos ?? []);
+      // Map media response to PhotoRecord shape for the existing TimelineFeed
+      setPhotos(
+        (payload.media ?? []).map((item: any) => ({
+          _id: item._id,
+          image_url: item.media_url,
+          timestamp: item.timestamp,
+          prompt: item.prompt,
+          user_id: item.user_id,
+          event_id: item.event_id
+        }))
+      );
     } catch (error) {
-      console.error("Failed to fetch photos", error);
+      console.error("Failed to fetch media", error);
     } finally {
       setLoading(false);
     }
@@ -35,10 +45,10 @@ export default function HomePage() {
     async (imageData: string) => {
       setUploading(true);
       try {
-        const response = await fetch("/api/photos", {
+        const response = await fetch("/api/media", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageData, prompt, userId: "guest" })
+          body: JSON.stringify({ imageData, prompt })
         });
 
         if (!response.ok) {
@@ -46,7 +56,18 @@ export default function HomePage() {
         }
 
         const payload = await response.json();
-        setPhotos((prev) => [payload.photo, ...prev]);
+        // Map the media response to PhotoRecord shape
+        setPhotos((prev) => [
+          {
+            _id: payload.media._id,
+            image_url: payload.media.media_url,
+            timestamp: payload.media.timestamp,
+            prompt: payload.media.prompt,
+            user_id: payload.media.user_id,
+            event_id: payload.media.event_id
+          },
+          ...prev
+        ]);
       } catch (error) {
         console.error(error);
       } finally {
