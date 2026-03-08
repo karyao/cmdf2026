@@ -12,6 +12,7 @@ export default function HomePage() {
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const prompt = useMemo(() => getPromptByHour(), []);
 
   const loadPhotos = useCallback(async () => {
@@ -68,6 +69,10 @@ export default function HomePage() {
           },
           ...prev
         ]);
+        
+        // Show success popup
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
       } catch (error) {
         console.error(error);
       } finally {
@@ -82,6 +87,26 @@ export default function HomePage() {
       <PromptHeader prompt={prompt} />
       <CameraModule prompt={prompt} onCapture={handleCapture} uploading={uploading} />
       <TimelineFeed photos={photos} loading={loading} />
+      
+      {/* Success Popup Toast */}
+      {showSuccess && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: '#4ade80',
+          color: '#166534',
+          padding: '12px 24px',
+          borderRadius: '999px',
+          fontWeight: 'bold',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          zIndex: 50,
+          animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+        }}>
+          ✅ Image saved to database!
+        </div>
+      )}
     </AppLayout>
   );
 }

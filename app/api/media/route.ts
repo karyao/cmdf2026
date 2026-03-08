@@ -90,15 +90,19 @@ export async function POST(request: NextRequest) {
     let mediaType = body.media_type ?? "photo";
 
     // Handle base64 image from camera capture
+    // Handle base64 image from camera capture
     if (body.imageData) {
-      if (!body.imageData.startsWith("data:image")) {
+      const isDataUri = body.imageData.startsWith("data:image");
+      // Basic check: should be a data URI or a long continuous string (raw base64)
+      if (!isDataUri && body.imageData.length < 100) {
         return NextResponse.json({ error: "Invalid image payload" }, { status: 400 });
       }
 
-      // Local-first: store data URL in MongoDB by default.
-      // Only upload to Cloudinary when explicitly requested with useCloud: true
+      // Local-first: save to public/uploads by default
       if (body.useCloud) {
-        const uploaded = await uploadToCloudinary(body.imageData);
+        // Cloudinary requires the data: URI prefix, so add it if it's missing
+        const uploadData = isDataUri ? body.imageData : `data:image/jpeg;base64,${body.imageData}`;
+        const uploaded = await uploadToCloudinary(uploadData);
         if (uploaded) {
           mediaUrl = uploaded.secure_url;
           thumbnailUrl = uploaded.secure_url.replace("/upload/", "/upload/w_400,c_scale/");
@@ -111,9 +115,39 @@ export async function POST(request: NextRequest) {
           mimeType = "image/jpeg";
         }
       } else {
-        // Default: store the base64 data URL directly in MongoDB
-        mediaUrl = body.imageData;
-        mimeType = "image/jpeg";
+        // Default: save actual physical file to public/uploads
+        try {
+          // Robust decoding: some payloads arrive with double prefixes like
+          // "data:image/jpeg;base64,data:image/png;base64,..."
+          // We find the LAST "base64," to find the start of the real pixel data.
+          const lastBase64Index = body.imageData.lastIndexOf("base64,");
+          const base64Data = lastBase64Index !== -1 
+            ? body.imageData.substring(lastBase64Index + 7) 
+            : body.imageData;
+            
+          const buffer = Buffer.from(base64Data, "base64");
+          
+          const fs = await import("fs/promises");
+          const path = await import("path");
+          
+          const uploadsDir = path.join(process.cwd(), "public", "uploads");
+          // Ensure directory exists
+          await fs.mkdir(uploadsDir, { recursive: true });
+          
+          const filename = `capture_${Date.now()}.jpg`;
+          const filepath = path.join(uploadsDir, filename);
+          
+          await fs.writeFile(filepath, buffer);
+          
+          // The public URL starts at the root /
+          mediaUrl = `/uploads/${filename}`;
+          mimeType = "image/jpeg";
+        } catch (fileErr) {
+          console.error("Failed to save physical file:", fileErr);
+          // Fallback to data URL if disk write fails
+          mediaUrl = body.imageData;
+          mimeType = "image/jpeg";
+        }
       }
       mediaType = "photo";
     }

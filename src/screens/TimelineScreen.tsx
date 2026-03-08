@@ -17,10 +17,18 @@ export function TimelineScreen() {
         const res = await fetch("http://localhost:3000/api/media?type=photo");
         const data = await res.json();
         
-        // Only keep local base64 images (ignore Cloudinary URLs and broken tiny tests)
-        const localOnly = (data.media || []).filter((item: any) => 
-          item.media_url?.startsWith("data:image") && item.media_url.length > 100
-        );
+        // Only keep local images (either new /uploads/ paths or old base64 strings)
+        const localOnly = (data.media || [])
+          .filter((item: any) => {
+            const url = item.media_url || "";
+            return (url.startsWith("/uploads/") || url.startsWith("data:image")) && url.length > 10;
+          })
+          .map((item: any) => ({
+            ...item,
+            media_url: item.media_url.startsWith("/uploads/") 
+              ? `http://localhost:3000${item.media_url}` 
+              : item.media_url
+          }));
         
         setPhotos(localOnly);
       } catch (err) {

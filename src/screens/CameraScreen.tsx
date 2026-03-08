@@ -11,6 +11,7 @@ export function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>("back");
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
+  const [capturedBase64, setCapturedBase64] = useState<string | null | undefined>(null);
   const [capturedWithFrontCamera, setCapturedWithFrontCamera] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const openSlot = activeEvent.slots.find((slot) => slot.status === "window_open");
@@ -28,20 +29,55 @@ export function CameraScreen() {
       setIsCapturing(true);
       const result = await cameraRef.current.takePictureAsync({
         quality: 0.8,
+        base64: true,
         mirror: false
       });
-      setCapturedUri(result.uri);
+      setCapturedUri(result?.uri ?? null);
+      setCapturedBase64(result?.base64);
       setCapturedWithFrontCamera(facing === "front");
     } finally {
       setIsCapturing(false);
     }
   };
 
-  const submitPhoto = () => {
-    if (!openSlot || !capturedUri) return;
-    markSlot(openSlot.id, "submitted", capturedUri, capturedWithFrontCamera);
-    setCapturedUri(null);
-    setCapturedWithFrontCamera(false);
+  const submitPhoto = async () => {
+    if (!openSlot || !capturedUri || !capturedBase64) return;
+    
+    setIsCapturing(true); // Use same loading state
+    const imageData = `data:image/jpeg;base64,${capturedBase64}`;
+    
+    try {
+      const res = await fetch("http://localhost:3000/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageData,
+          prompt: openSlot.promptText,
+          useCloud: false
+        })
+      });
+      
+      const data = await res.json();
+      if (res.ok && data.media) {
+        // Construct the full URL to the public upload folder
+        const finalUrl = data.media.media_url.startsWith("/")
+          ? `http://localhost:3000${data.media.media_url}`
+          : data.media.media_url;
+          
+        markSlot(openSlot.id, "submitted", finalUrl, capturedWithFrontCamera);
+      } else {
+        console.error("Backend error:", data.error);
+        markSlot(openSlot.id, "submitted", capturedUri, capturedWithFrontCamera);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      markSlot(openSlot.id, "submitted", capturedUri, capturedWithFrontCamera);
+    } finally {
+      setCapturedUri(null);
+      setCapturedBase64(null);
+      setCapturedWithFrontCamera(false);
+      setIsCapturing(false);
+    }
   };
 
   const skipSlot = () => {
