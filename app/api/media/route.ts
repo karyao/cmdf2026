@@ -153,6 +153,23 @@ export async function POST(request: NextRequest) {
     let height = body.height ?? null;
     let mediaType = body.media_type ?? "photo";
 
+    await connectToDatabase();
+
+    const rawEventId = body.event_id ?? body.eventId ?? body.eventID ?? null;
+    let eventId: string | null = null;
+    if (rawEventId) {
+      const s = String(rawEventId).trim();
+      if (s.length === 24) eventId = s;
+    }
+
+    let isPublicEvent = true;
+    if (eventId) {
+      const event = await Event.findById(eventId).lean();
+      if (event && (event as any).type === "private") {
+        isPublicEvent = false;
+      }
+    }
+
     // Handle base64 image from camera capture
     // Handle base64 image from camera capture
     if (body.imageData) {
@@ -170,9 +187,11 @@ export async function POST(request: NextRequest) {
         // Extract pure base64 for Gemini check
         const rawBase64 = uploadData.substring(uploadData.indexOf("base64,") + 7);
         // --- Gemini NSFW Check ---
-        const isSafe = await validateImageSafely(rawBase64, "image/jpeg");
-        if (!isSafe) {
-          return NextResponse.json({ error: "Inappropriate content detected and blocked by safety filters." }, { status: 400 });
+        if (isPublicEvent) {
+          const isSafe = await validateImageSafely(rawBase64, "image/jpeg");
+          if (!isSafe) {
+            return NextResponse.json({ error: "Inappropriate content detected and blocked by safety filters." }, { status: 400 });
+          }
         }
         // -------------------------
 
@@ -202,9 +221,11 @@ export async function POST(request: NextRequest) {
           const buffer = Buffer.from(base64Data, "base64");
           
           // --- Gemini NSFW Check ---
-          const isSafe = await validateImageSafely(base64Data, "image/jpeg");
-          if (!isSafe) {
-            return NextResponse.json({ error: "Inappropriate content detected and blocked by safety filters." }, { status: 400 });
+          if (isPublicEvent) {
+            const isSafe = await validateImageSafely(base64Data, "image/jpeg");
+            if (!isSafe) {
+              return NextResponse.json({ error: "Inappropriate content detected and blocked by safety filters." }, { status: 400 });
+            }
           }
           // -------------------------
 
@@ -247,8 +268,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await connectToDatabase();
-
     console.log("DEBUG: POST /api/media body keys:", Object.keys(body));
     if (body.userId) console.log("DEBUG: POST /api/media body.userId value:", body.userId);
 
@@ -263,13 +282,6 @@ export async function POST(request: NextRequest) {
     } else {
       const searchParams = new URL(request.url).searchParams;
       userId = body.userId ?? searchParams.get("userId") ?? request.headers.get("x-user-id") ?? null;
-    }
-
-    const rawEventId = body.event_id ?? body.eventId ?? body.eventID ?? null;
-    let eventId: string | null = null;
-    if (rawEventId) {
-      const s = String(rawEventId).trim();
-      if (s.length === 24) eventId = s;
     }
 
     const created = await Media.create({
