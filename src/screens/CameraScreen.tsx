@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { theme } from "../theme/theme";
 import { useEventStore } from "../store/useEventStore";
@@ -16,6 +16,7 @@ export function CameraScreen() {
   const [capturedWithFrontCamera, setCapturedWithFrontCamera] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [description, setDescription] = useState("");
   const openSlot = activeEvent.slots.find((slot) => slot.status === "window_open");
   const latestSubmitted = useMemo(
     () =>
@@ -56,6 +57,7 @@ export function CameraScreen() {
         body: JSON.stringify({
           imageData,
           prompt: openSlot.promptText,
+          caption: description.trim(),
           event_id: activeEvent.id,
           userId: DEMO_USER_ID,
           width: dimensions?.width,
@@ -84,6 +86,7 @@ export function CameraScreen() {
       setCapturedBase64(null);
       setDimensions(null);
       setCapturedWithFrontCamera(false);
+      setDescription("");
       setIsCapturing(false);
     }
   };
@@ -92,6 +95,7 @@ export function CameraScreen() {
     if (!openSlot) return;
     setCapturedUri(null);
     setCapturedWithFrontCamera(false);
+    setDescription("");
     markSlot(openSlot.id, "skipped_private");
   };
 
@@ -120,6 +124,7 @@ export function CameraScreen() {
                   onPress={() => {
                     setCapturedUri(null);
                     setCapturedWithFrontCamera(false);
+                    setDescription("");
                   }}
                   disabled={!capturedUri}
                 >
@@ -167,6 +172,20 @@ export function CameraScreen() {
             <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} mirror={false} />
           </View>
         )}
+        {capturedUri ? (
+          <View style={styles.captionWrap}>
+            <Text style={styles.captionLabel}>Add a description</Text>
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="What is happening in this moment?"
+              placeholderTextColor="#8b8aa5"
+              style={styles.captionInput}
+              multiline
+              maxLength={180}
+            />
+          </View>
+        ) : null}
         {latestSubmitted?.imageUrl ? (
           <View style={styles.latestWrap}>
             <Text style={styles.latestTitle}>Latest submitted photo</Text>
@@ -289,6 +308,26 @@ const styles = StyleSheet.create({
   meta: {
     marginTop: 14,
     color: theme.colors.mutedText
+  },
+  captionWrap: {
+    marginTop: 12,
+    gap: 6
+  },
+  captionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.text
+  },
+  captionInput: {
+    minHeight: 56,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    backgroundColor: "#fff",
+    color: theme.colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlignVertical: "top"
   },
   latestWrap: {
     marginTop: 16

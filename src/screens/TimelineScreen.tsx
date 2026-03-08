@@ -7,6 +7,8 @@ import { useEventStore } from "../store/useEventStore";
 import { AvatarStack } from "../components/AvatarStack";
 import { DEMO_USER_ID, apiUrl } from "../lib/api";
 
+const LEGACY_DEFAULT_PROMPT = "Show your current moment.";
+
 export function TimelineScreen() {
   const { activeEvent } = useEventStore();
   const [photos, setPhotos] = useState<any[]>([]);
@@ -78,7 +80,11 @@ export function TimelineScreen() {
               </View>
               <View style={styles.entryBody}>
                 <StickerCard>
-                  <Text style={styles.prompt}>{photo.prompt || "Photo Upload"}</Text>
+                  <Text style={styles.prompt}>
+                    {photo.caption?.trim() ||
+                      (photo.prompt === LEGACY_DEFAULT_PROMPT ? "" : photo.prompt) ||
+                      "Photo Upload"}
+                  </Text>
                   <Image source={{ uri: photo.media_url }} style={[styles.photo, styles.unmirror]} resizeMode="cover" />
                   <Text style={styles.meta}>Status: submitted</Text>
                 </StickerCard>
@@ -97,7 +103,9 @@ export function TimelineScreen() {
               </View>
               <View style={styles.entryBody}>
                 <StickerCard>
-                  <Text style={styles.prompt}>{slot.promptText}</Text>
+                  {slot.promptText && slot.promptText !== LEGACY_DEFAULT_PROMPT ? (
+                    <Text style={styles.prompt}>{slot.promptText}</Text>
+                  ) : null}
                   <Text style={styles.meta}>
                     Status: {slot.status} {slot.promptType === "creative_hint" ? "• Creative Hint" : ""}
                   </Text>

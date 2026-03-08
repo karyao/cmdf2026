@@ -28,7 +28,6 @@ interface LobbyGridProps {
   onRequestPermission?: () => void;
   onCapture?: () => void;
   onRetake?: () => void;
-  onSubmit?: () => void;
   onFlip?: () => void;
 }
 
@@ -54,7 +53,6 @@ export function LobbyGrid({
   onRequestPermission,
   onCapture,
   onRetake,
-  onSubmit,
   onFlip,
 }: LobbyGridProps) {
   const count = Math.min(members.length, 4);
@@ -87,15 +85,6 @@ export function LobbyGrid({
               <View style={styles.cameraOverlay}>
                 <Pressable style={styles.overlayBtnSecondary} onPress={onRetake}>
                   <Text style={styles.overlayBtnText}>↩ Retake</Text>
-                </Pressable>
-                <Pressable 
-                  style={styles.overlayBtnPrimary} 
-                  onPress={onSubmit}
-                  disabled={isCapturing}
-                >
-                  <Text style={styles.overlayBtnPrimaryText}>
-                    {isCapturing ? "Uploading..." : "✓ Use Photo"}
-                  </Text>
                 </Pressable>
               </View>
             </>

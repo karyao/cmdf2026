@@ -17,7 +17,7 @@ const seedSlots: PromptSlot[] = Array.from({ length: 8 }).map((_, i) => {
     id: `slot-${i + 1}`,
     timestamp,
     status: i === 7 ? "window_open" : "scheduled",
-    promptText: "Show your current moment.",
+    promptText: "",
     promptType: "default"
   };
 });

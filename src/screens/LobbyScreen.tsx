@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
@@ -44,6 +44,7 @@ export function LobbyScreen() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedWithFrontCamera, setCapturedWithFrontCamera] = useState(false);
   const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [description, setDescription] = useState("");
 
   // Event photos state
   const [eventPhotos, setEventPhotos] = useState<EventPhoto[]>([]);
@@ -146,6 +147,7 @@ export function LobbyScreen() {
     setCapturedUri(null);
     setCapturedBase64(null);
     setDimensions(null);
+    setDescription("");
   }, [activeEventId]);
 
   // Camera functions
@@ -170,6 +172,7 @@ export function LobbyScreen() {
     setCapturedBase64(null);
     setDimensions(null);
     setCapturedWithFrontCamera(false);
+    setDescription("");
   };
 
   const handleSubmit = async () => {
@@ -183,7 +186,8 @@ export function LobbyScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageData,
-          prompt: "Show your current moment.",
+          prompt: "",
+          caption: description.trim(),
           event_id: activeEventId,
           userId: DEMO_USER_ID,
           width: dimensions?.width,
@@ -201,6 +205,7 @@ export function LobbyScreen() {
       setCapturedUri(null);
       setCapturedBase64(null);
       setDimensions(null);
+      setDescription("");
       setIsCapturing(false);
     }
   };
@@ -339,13 +344,42 @@ export function LobbyScreen() {
                       onRequestPermission={requestPermission}
                       onCapture={handleCapture}
                       onRetake={handleRetake}
-                      onSubmit={handleSubmit}
                       onFlip={handleFlip}
                     />
                   </View>
                 )}
 
                 <Text style={styles.modalBody}>{activeEvent.memberCount} people joined this event.</Text>
+                {activeEvent.joined ? (
+                  <View style={styles.captionWrap}>
+                    <Text style={styles.captionLabel}>Add a description</Text>
+                    <TextInput
+                      value={description}
+                      onChangeText={setDescription}
+                      placeholder="What is happening in this moment?"
+                      placeholderTextColor="#8b8aa5"
+                      style={styles.captionInput}
+                      multiline
+                      maxLength={180}
+                    />
+                    <Text style={styles.captionHint}>
+                      This description will appear in the timeline when you submit the photo.
+                    </Text>
+                    {capturedUri ? (
+                      <Pressable
+                        onPress={handleSubmit}
+                        disabled={isCapturing}
+                        style={[styles.button, styles.submitPhotoButton]}
+                      >
+                        {isCapturing ? (
+                          <ActivityIndicator color="#ffffff" size="small" />
+                        ) : (
+                          <Text style={styles.joinedButtonText}>Submit Photo + Description</Text>
+                        )}
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
 
                 {activeEvent.joined && (
                   <Pressable
@@ -532,6 +566,30 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: theme.colors.text
   },
+  captionWrap: {
+    marginTop: 10,
+    gap: 6
+  },
+  captionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.text
+  },
+  captionInput: {
+    minHeight: 56,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    backgroundColor: "#fff",
+    color: theme.colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlignVertical: "top"
+  },
+  captionHint: {
+    fontSize: 12,
+    color: theme.colors.mutedText
+  },
   notice: {
     borderRadius: theme.radius.lg,
     borderWidth: 2,
@@ -570,4 +628,12 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     textAlign: "center",
   },
+  submitPhotoButton: {
+    marginTop: 6,
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#16a34a",
+    borderColor: "#125f33"
+  }
 });

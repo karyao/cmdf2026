@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
@@ -6,33 +6,42 @@ import { theme } from "../theme/theme";
 export function WrappedScreen() {
   return (
     <Screen>
-      <View style={styles.content}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>EVENT WRAPPED</Text>
-        </View>
-        <Text style={styles.title}>Event Wrapped</Text>
-        <Text style={styles.subtitle}>Spotify-style summary view placeholder</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>EVENT WRAPPED</Text>
+          </View>
+          <Text style={styles.title}>Event Wrapped</Text>
+          <Text style={styles.subtitle}>Spotify-style summary view placeholder</Text>
 
-        <StickerCard>
-          <Text style={styles.statLabel}>On-time capture rate</Text>
-          <Text style={styles.statValue}>78%</Text>
-        </StickerCard>
-        <StickerCard>
-          <Text style={styles.statLabel}>Top hour</Text>
-          <Text style={styles.statValue}>3:00 PM</Text>
-        </StickerCard>
-        <StickerCard>
-          <Text style={styles.statLabel}>Longest streak</Text>
-          <Text style={styles.statValue}>9 slots</Text>
-        </StickerCard>
-      </View>
+          <StickerCard>
+            <Text style={styles.statLabel}>On-time capture rate</Text>
+            <Text style={styles.statValue}>78%</Text>
+          </StickerCard>
+          <StickerCard>
+            <Text style={styles.statLabel}>Top hour</Text>
+            <Text style={styles.statValue}>3:00 PM</Text>
+          </StickerCard>
+          <StickerCard>
+            <Text style={styles.statLabel}>Longest streak</Text>
+            <Text style={styles.statValue}>9 slots</Text>
+          </StickerCard>
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingTop: 12,
+    paddingBottom: 28,
+    paddingHorizontal: 12
+  },
   content: {
-    padding: 16,
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
     gap: 14
   },
   badge: {
