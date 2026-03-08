@@ -4,6 +4,52 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectToDatabase } from "@/lib/db";
 import { Media } from "@/lib/models/Media";
 import { Event } from "@/lib/models/Event";
+import { GoogleGenAI } from "@google/genai";
+
+/**
+ * Validates a base64 image against Gemini 2.5 Flash for NSFW content.
+ * Rotates randomly through GEMINI_API_KEYS.
+ */
+async function validateImageSafely(base64Data: string, mimeType: string): Promise<boolean> {
+  const keysEnv = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
+  if (!keysEnv) {
+    console.warn("⚠️ No GEMINI_API_KEYS found in environment. Skipping NSFW check for testing.");
+    return true; // Skip checking if no API keys are provided
+  }
+
+  const keys = keysEnv.split(",").map(k => k.trim()).filter(Boolean);
+  if (keys.length === 0) return true;
+
+  // Pick a random key for rate limit distribution
+  const randomKey = keys[Math.floor(Math.random() * keys.length)];
+  const ai = new GoogleGenAI({ apiKey: randomKey });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        "You are a strict safety moderator for a hackathon photo sharing app. Is this image inappropriate, NSFW, violent, or sexually explicit? Reply with exactly YES or NO.",
+        {
+          inlineData: {
+            data: base64Data,
+            mimeType: mimeType || "image/jpeg"
+          }
+        }
+      ]
+    });
+
+    const answer = response.text?.trim().toUpperCase();
+    if (answer?.includes("YES")) {
+      console.warn("🚫 NSFW Content Detected by Gemini!");
+      return false; // Not safe
+    }
+    return true; // Safe
+  } catch (err) {
+    console.error("Gemini Validation Error:", err);
+    // If the API fails (timeout/quota), allow the upload rather than breaking the app during a hackathon
+    return true; 
+  }
+}
 
 /**
  * Uploads a base64 image to Cloudinary.
@@ -120,6 +166,16 @@ export async function POST(request: NextRequest) {
       if (body.useCloud) {
         // Cloudinary requires the data: URI prefix, so add it if it's missing
         const uploadData = isDataUri ? body.imageData : `data:image/jpeg;base64,${body.imageData}`;
+        
+        // Extract pure base64 for Gemini check
+        const rawBase64 = uploadData.substring(uploadData.indexOf("base64,") + 7);
+        // --- Gemini NSFW Check ---
+        const isSafe = await validateImageSafely(rawBase64, "image/jpeg");
+        if (!isSafe) {
+          return NextResponse.json({ error: "Inappropriate content detected and blocked by safety filters." }, { status: 400 });
+        }
+        // -------------------------
+
         const uploaded = await uploadToCloudinary(uploadData);
         if (uploaded) {
           mediaUrl = uploaded.secure_url;
@@ -145,6 +201,13 @@ export async function POST(request: NextRequest) {
             
           const buffer = Buffer.from(base64Data, "base64");
           
+          // --- Gemini NSFW Check ---
+          const isSafe = await validateImageSafely(base64Data, "image/jpeg");
+          if (!isSafe) {
+            return NextResponse.json({ error: "Inappropriate content detected and blocked by safety filters." }, { status: 400 });
+          }
+          // -------------------------
+
           const fs = await import("fs/promises");
           const path = await import("path");
           
