@@ -1,21 +1,44 @@
-import { ScrollView, Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
+import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
+import { apiUrl, DEMO_USER_ID } from "../lib/api";
 
 const highlights = ["Trips", "Study", "Food", "Friends"];
-const posts = [
-  { id: "p1", color: "#ffd9e8" },
-  { id: "p2", color: "#d8f5ff" },
-  { id: "p3", color: "#ffe7c2" },
-  { id: "p4", color: "#e2ffd6" },
-  { id: "p5", color: "#ece2ff" },
-  { id: "p6", color: "#ffe0cf" },
-  { id: "p7", color: "#fff1b8" },
-  { id: "p8", color: "#d7f0ff" },
-  { id: "p9", color: "#f7dcff" }
-];
+
+interface RecapVideo {
+  _id: string;
+  video_url: string;
+  title: string;
+  duration_seconds: number;
+  photo_count: number;
+  participants: string[];
+  event_title: string;
+  event_city: string;
+  createdAt: string;
+}
 
 export function ProfileScreen() {
+  const [videos, setVideos] = useState<RecapVideo[]>([]);
+  const [loadingVideos, setLoadingVideos] = useState(true);
+
+  const fetchVideos = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/videos?userId=${DEMO_USER_ID}`));
+      const data = await res.json();
+      setVideos(data.videos || []);
+    } catch (err) {
+      console.error("Failed to fetch videos:", err);
+    } finally {
+      setLoadingVideos(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVideos();
+  }, [fetchVideos]);
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
@@ -37,8 +60,8 @@ export function ProfileScreen() {
 
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
-              <Text style={styles.statNum}>84</Text>
-              <Text style={styles.statLabel}>Posts</Text>
+              <Text style={styles.statNum}>{videos.length}</Text>
+              <Text style={styles.statLabel}>Recaps</Text>
             </View>
             <View style={styles.statPill}>
               <Text style={styles.statNum}>1.2k</Text>
@@ -74,13 +97,57 @@ export function ProfileScreen() {
           </View>
 
           <View style={styles.sectionHead}>
-            <Text style={styles.sectionTitle}>Posts</Text>
+            <Text style={styles.sectionTitle}>Recap Videos</Text>
           </View>
-          <View style={styles.grid}>
-            {posts.map((post) => (
-              <View key={post.id} style={[styles.postTile, { backgroundColor: post.color }]} />
-            ))}
-          </View>
+
+          {loadingVideos ? (
+            <ActivityIndicator color={theme.colors.text} style={{ marginTop: 16 }} />
+          ) : videos.length === 0 ? (
+            <StickerCard>
+              <Text style={styles.emptyTitle}>No recaps yet</Text>
+              <Text style={styles.emptyBody}>Join an event, take photos, and generate a recap video from the Lobby!</Text>
+            </StickerCard>
+          ) : (
+            <View style={styles.videoGrid}>
+              {videos.map((video) => {
+                const date = new Date(video.createdAt);
+                const dateStr = date.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                });
+                const timeStr = date.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
+
+                return (
+                  <StickerCard key={video._id}>
+                    <View style={styles.videoCard}>
+                      {/* Video thumbnail / player area */}
+                      <View style={styles.videoPreview}>
+                        <Text style={styles.videoPlayIcon}>▶</Text>
+                        <Text style={styles.videoDuration}>
+                          {Math.floor(video.duration_seconds / 60)}:{String(video.duration_seconds % 60).padStart(2, "0")}
+                        </Text>
+                      </View>
+                      <Text style={styles.videoTitle}>{video.title}</Text>
+                      <Text style={styles.videoMeta}>
+                        {video.event_city} • {dateStr} at {timeStr}
+                      </Text>
+                      <View style={styles.videoStats}>
+                        <View style={styles.videoStatPill}>
+                          <Text style={styles.videoStatText}>📸 {video.photo_count} photos</Text>
+                        </View>
+                        <View style={styles.videoStatPill}>
+                          <Text style={styles.videoStatText}>👥 {video.participants.length}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </StickerCard>
+                );
+              })}
+            </View>
+          )}
 
           <View style={styles.list}>
             <Pressable style={styles.item}>
@@ -252,18 +319,75 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: theme.colors.mutedText
   },
-  grid: {
+  // Video grid styles
+  videoGrid: {
+    gap: 12,
+  },
+  videoCard: {
+    gap: 8,
+  },
+  videoPreview: {
+    width: "100%",
+    height: 180,
+    borderRadius: theme.radius.lg,
+    backgroundColor: "#1a1a2e",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    overflow: "hidden",
+  },
+  videoPlayIcon: {
+    fontSize: 40,
+    color: "rgba(255,255,255,0.9)",
+  },
+  videoDuration: {
+    position: "absolute",
+    bottom: 8,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: "hidden",
+  },
+  videoTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
+  videoMeta: {
+    fontSize: 13,
+    color: theme.colors.mutedText,
+  },
+  videoStats: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6
+    gap: 8,
   },
-  postTile: {
-    width: "32%",
-    aspectRatio: 1,
-    borderRadius: theme.radius.md,
-    borderWidth: 2,
-    borderColor: "#f4ecff"
+  videoStatPill: {
+    backgroundColor: "#f0edff",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
+  videoStatText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
+  // Empty state
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
+  emptyBody: {
+    marginTop: 4,
+    color: theme.colors.mutedText,
+  },
+  // Settings
   list: {
     marginTop: 12,
     gap: 10

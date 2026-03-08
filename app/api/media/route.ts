@@ -33,6 +33,9 @@ async function uploadToCloudinary(imageData: string) {
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
+    // Ensure the Event model is registered for populate() — the import alone
+    // can be tree-shaken by Turbopack on cold starts.
+    void Event;
 
     const { searchParams } = new URL(request.url);
     const eventId = searchParams.get("eventId");

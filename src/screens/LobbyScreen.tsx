@@ -49,6 +49,10 @@ export function LobbyScreen() {
   const [eventPhotos, setEventPhotos] = useState<EventPhoto[]>([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
 
+  // Video generation state
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [videoMessage, setVideoMessage] = useState<string | null>(null);
+
   const loadEvents = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -207,6 +211,30 @@ export function LobbyScreen() {
 
   const closeModal = () => {
     setActiveEventId(null);
+    setVideoMessage(null);
+  };
+
+  const handleGenerateRecap = async () => {
+    if (!activeEventId || isGeneratingVideo) return;
+    setIsGeneratingVideo(true);
+    setVideoMessage(null);
+    try {
+      const res = await fetch(apiUrl("/api/videos/generate"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: activeEventId, userId: DEMO_USER_ID }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setVideoMessage(`✅ Recap video created! Check your Profile tab.`);
+      } else {
+        setVideoMessage(`❌ ${data.error || "Failed to generate video"}`);
+      }
+    } catch (err) {
+      setVideoMessage("❌ Network error while generating video");
+    } finally {
+      setIsGeneratingVideo(false);
+    }
   };
 
   const joinedEvent = events.find((e) => e.joined);
@@ -298,7 +326,7 @@ export function LobbyScreen() {
                   <View style={styles.gridWrapper}>
                     <LobbyGrid
                       members={activeMembers}
-                      containerHeight={320}
+                      containerHeight={520}
                       isJoined={activeEvent.joined}
                       currentUserId={DEMO_USER_ID}
                       eventPhotos={eventPhotos}
@@ -318,6 +346,21 @@ export function LobbyScreen() {
                 )}
 
                 <Text style={styles.modalBody}>{activeEvent.memberCount} people joined this event.</Text>
+
+                {activeEvent.joined && (
+                  <Pressable
+                    onPress={handleGenerateRecap}
+                    disabled={isGeneratingVideo}
+                    style={[styles.button, styles.recapButton]}
+                  >
+                    <Text style={styles.recapButtonText}>
+                      {isGeneratingVideo ? "🎬 Rendering..." : "🎬 Generate Recap Video"}
+                    </Text>
+                  </Pressable>
+                )}
+                {videoMessage ? (
+                  <Text style={styles.videoMessage}>{videoMessage}</Text>
+                ) : null}
 
                 {activeEvent.joined ? (
                   <Pressable
@@ -507,5 +550,24 @@ const styles = StyleSheet.create({
   gridWrapper: {
     marginTop: 16,
     marginBottom: 8,
+  },
+  recapButton: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#7c3aed",
+    borderColor: "#5b21b6",
+  },
+  recapButtonText: {
+    color: "#ffffff",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  videoMessage: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.colors.text,
+    textAlign: "center",
   },
 });
