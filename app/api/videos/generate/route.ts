@@ -10,6 +10,20 @@ const FRAMES_PER_PHOTO = 90;
 const INTRO_FRAMES = 90;
 const OUTRO_FRAMES = 90;
 const FPS = 30;
+const SAMPLE_MEMBER_IMAGES = [
+  "/images/IMG_1450.jpeg",
+  "/images/IMG_1240.jpeg",
+  "/images/IMG_1485.jpeg",
+  "/images/IMG_0555.jpeg",
+  "/images/IMG_0559.jpeg",
+  "/images/IMG_0565.jpeg",
+  "/images/IMG_0540.jpeg",
+  "/images/IMG_1644.jpeg",
+  "/images/IMG_1501.jpeg",
+  "/images/IMG_1235.jpeg"
+];
+const DUMMY_MEMBER_NAMES = ["Alex", "Jordan", "Morgan", "Taylor", "Megan", "Noah"];
+const FORCED_SAMPLE_NAMES = ["Jordan", "Megan"];
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,21 +53,94 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
+    const requestingUserId = String(userId || "000000000000000000000001");
+    const memberIds = ((event as any).members ?? []).map((m: any) => String(m));
+    const participantNameById = new Map<string, string>();
+    let dummyCursor = 0;
+    for (const id of memberIds) {
+      if (id === requestingUserId) {
+        participantNameById.set(id, "You");
+      } else {
+        participantNameById.set(id, DUMMY_MEMBER_NAMES[dummyCursor % DUMMY_MEMBER_NAMES.length]);
+        dummyCursor += 1;
+      }
+    }
+
     const photoSlides = photos.map((p: any) => {
       let url = p.media_url;
       if (url.startsWith("/")) url = `${baseUrl}${url}`;
+      const ownerId = p.user_id ? String(p.user_id) : "";
       return {
         url,
-        participantName: p.user_id === (userId || "000000000000000000000001") ? "You" : "Member",
+        participantName: participantNameById.get(ownerId) ?? (ownerId === requestingUserId ? "You" : "Member"),
         timestamp: p.timestamp?.toISOString?.() ?? new Date(p.timestamp).toISOString(),
         width: p.width,
         height: p.height,
       };
     });
 
-    const participants = [...new Set(photos.map((p: any) => String(p.user_id)))].map(
-      (id) => (id === (userId || "000000000000000000000001") ? "You" : "Member")
-    );
+    const participants = memberIds.length
+      ? memberIds.map((id) => participantNameById.get(id) ?? "Member")
+      : [...new Set(photos.map((p: any) => String(p.user_id)))].map((id) =>
+          id === requestingUserId ? "You" : "Member"
+        );
+
+    // If event members have not uploaded yet, add sample photos so recap shows everyone.
+    const existingPhotoOwnerIds = new Set(photos.map((p: any) => String(p.user_id)));
+    let sampleIdx = 0;
+    const baseTimestampMs = photos.length
+      ? new Date((photos as any[])[photos.length - 1].timestamp).getTime()
+      : new Date((event as any).createdAt ?? Date.now()).getTime();
+
+    for (const memberId of memberIds) {
+      if (existingPhotoOwnerIds.has(memberId)) continue;
+      const samplePath = SAMPLE_MEMBER_IMAGES[sampleIdx % SAMPLE_MEMBER_IMAGES.length];
+      sampleIdx += 1;
+      photoSlides.push({
+        url: `${baseUrl}${samplePath}`,
+        participantName: participantNameById.get(memberId) ?? "Member",
+        timestamp: new Date(baseTimestampMs + sampleIdx * 60_000).toISOString(),
+        width: null,
+        height: null
+      });
+    }
+
+    // Force recap head to include You + 2 local sample images from public/images.
+    // This guarantees a visible 3-person first grid regardless of upload mix.
+    const baseTs = photos.length
+      ? new Date((photos as any[])[photos.length - 1].timestamp).getTime()
+      : new Date((event as any).createdAt ?? Date.now()).getTime();
+    const forcedSampleSlides = FORCED_SAMPLE_NAMES.map((name, idx) => {
+      const samplePath = SAMPLE_MEMBER_IMAGES[(sampleIdx + idx) % SAMPLE_MEMBER_IMAGES.length];
+      return {
+        url: `${baseUrl}${samplePath}`,
+        participantName: name,
+        timestamp: new Date(baseTs + (idx + 1) * 90_000).toISOString(),
+        width: null,
+        height: null
+      };
+    });
+    sampleIdx += forcedSampleSlides.length;
+    photoSlides.push(...forcedSampleSlides);
+
+    const firstUserSlide = photoSlides.find((slide) => slide.participantName === "You") ?? photoSlides[0];
+    const preferredHead = [firstUserSlide, ...forcedSampleSlides].filter(Boolean);
+
+    const seenKeys = new Set<string>();
+    const dedupeKey = (slide: any) => `${slide.participantName}|${slide.url}|${slide.timestamp}`;
+    const orderedPhotoSlides: typeof photoSlides = [];
+    for (const slide of preferredHead) {
+      const key = dedupeKey(slide);
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      orderedPhotoSlides.push(slide);
+    }
+    for (const slide of photoSlides) {
+      const key = dedupeKey(slide);
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      orderedPhotoSlides.push(slide);
+    }
 
     // Compute Wrapped stats
     // 1. Photo Streak — consecutive photos without missing
@@ -98,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     const WRAPPED_SLIDE_COUNT = 3;
     const WRAPPED_FRAMES_PER = 120;
-    const gridSlideCount = Math.max(1, Math.ceil(photoSlides.length / 4));
+    const gridSlideCount = Math.max(1, Math.ceil(orderedPhotoSlides.length / 4));
     const totalFrames = INTRO_FRAMES + gridSlideCount * FRAMES_PER_PHOTO + WRAPPED_SLIDE_COUNT * WRAPPED_FRAMES_PER + OUTRO_FRAMES;
     const durationSeconds = totalFrames / FPS;
 
@@ -108,7 +195,7 @@ export async function POST(request: NextRequest) {
       eventTitle: (event as any).title,
       eventCity,
       eventDate: (event as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
-      photos: photoSlides,
+      photos: orderedPhotoSlides,
       participants,
       wrappedStats,
     });
@@ -128,7 +215,35 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    const { outputPath } = JSON.parse(result);
+    // Remotion may print progress logs to stdout. Extract the JSON payload line safely.
+    let outputPath = "";
+    try {
+      outputPath = JSON.parse(result).outputPath;
+    } catch {
+      const lines = result
+        .split(/[\r\n]+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .reverse();
+
+      for (const line of lines) {
+        if (!line.startsWith("{") || !line.endsWith("}")) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (typeof parsed.outputPath === "string") {
+            outputPath = parsed.outputPath;
+            break;
+          }
+        } catch {
+          // Keep scanning.
+        }
+      }
+    }
+
+    if (!outputPath) {
+      throw new Error(`Render finished but output JSON could not be parsed: ${result.slice(0, 300)}`);
+    }
+
     const videoUrl = outputPath;
 
     // Save to database
