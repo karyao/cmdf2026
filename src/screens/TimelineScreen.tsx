@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
@@ -11,19 +11,22 @@ export function TimelineScreen() {
   const { activeEvent } = useEventStore();
   const [photos, setPhotos] = useState<any[]>([]);
 
-  const fetchPhotos = async () => { // Moved fetchPhotos outside useEffect
+  const pendingSlots = useMemo(
+    () => activeEvent.slots.filter((slot) => slot.status !== "submitted"),
+    [activeEvent.slots]
+  );
+
+  const fetchPhotos = async () => {
     try {
       const url = apiUrl(`/api/media?type=photo&userId=${DEMO_USER_ID}`);
       const res = await fetch(url);
       const data = await res.json();
-        
-      // Permissive filter: keep anything with a media_url that looks like a photo
-      const filtered = (data.media || [])
-        .filter((item: any) => {
-          const url = item.media_url || "";
-          return (url.includes("/uploads/") || url.startsWith("data:image")) && url.length > 10;
-        });
-        
+
+      const filtered = (data.media || []).filter((item: any) => {
+        const mediaUrl = item.media_url || "";
+        return (mediaUrl.includes("/uploads/") || mediaUrl.startsWith("data:image")) && mediaUrl.length > 10;
+      });
+
       setPhotos(filtered);
     } catch (err) {
       console.error("Failed to fetch photos:", err);
@@ -31,9 +34,10 @@ export function TimelineScreen() {
   };
 
   useEffect(() => {
-    fetchPhotos();
-    // Refresh every 5 seconds to get new photos
-    const interval = setInterval(fetchPhotos, 5000);
+    void fetchPhotos();
+    const interval = setInterval(() => {
+      void fetchPhotos();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -53,43 +57,61 @@ export function TimelineScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>{activeEvent.title}</Text>
-        <Text style={styles.subtitle}>Day in the Life • {activeEvent.city}</Text>
+        <View style={styles.column}>
+          <View style={styles.header}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>DAY STRIP</Text>
+            </View>
+            <Text style={styles.title}>{activeEvent.title}</Text>
+            <Text style={styles.subtitle}>Day in the Life • {activeEvent.city}</Text>
+            <AvatarStack members={activeEvent.members} />
+          </View>
 
-        {/* Show real uploaded photos first */}
-        {photos.length > 0 && photos.map((photo) => (
-          <StickerCard key={photo._id} containerStyle={styles.cardOverride} hideTape={true}>
-            <Text style={styles.slotTime}>{new Date(photo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-            <Text style={styles.prompt}>
-              {photo.event_title ? `[${photo.event_title}]: ` : ""}{photo.prompt || "Photo Upload"}
-            </Text>
-            <Image 
-              source={{ uri: photo.media_url }} 
-              style={[
-                styles.photo, 
-                photo.width && photo.height ? { aspectRatio: photo.width / photo.height } : {}
-              ]} 
-              resizeMode="cover" 
-            />
-            <Text style={styles.meta}>Status: submitted</Text>
-          </StickerCard>
-        ))}
+          {photos.map((photo, index) => (
+            <View key={photo._id} style={styles.timelineRow}>
+              <View style={styles.timeColumn}>
+                <Text style={styles.slotTime}>
+                  {new Date(photo.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </Text>
+                <View style={styles.node} />
+                {index !== photos.length - 1 || pendingSlots.length > 0 ? <View style={styles.connector} /> : null}
+              </View>
+              <View style={styles.entryBody}>
+                <StickerCard>
+                  <Text style={styles.prompt}>{photo.prompt || "Photo Upload"}</Text>
+                  <Image source={{ uri: photo.media_url }} style={[styles.photo, styles.unmirror]} resizeMode="cover" />
+                  <Text style={styles.meta}>Status: submitted</Text>
+                </StickerCard>
+              </View>
+            </View>
+          ))}
 
-        {activeEvent.slots.filter(s => s.status !== "submitted").map((slot) => (
-          <StickerCard key={slot.id}>
-            <Text style={styles.slotTime}>{new Date(slot.timestamp).toLocaleTimeString()}</Text>
-            <Text style={styles.prompt}>{slot.promptText}</Text>
-            <Text style={styles.meta}>
-              Status: {slot.status} {slot.promptType === "creative_hint" ? "• Creative Hint" : ""}
-            </Text>
-          </StickerCard>
-        ))}
+          {pendingSlots.map((slot, index) => (
+            <View key={slot.id} style={styles.timelineRow}>
+              <View style={styles.timeColumn}>
+                <Text style={styles.slotTime}>
+                  {new Date(slot.timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                </Text>
+                <View style={styles.node} />
+                {index !== pendingSlots.length - 1 ? <View style={styles.connector} /> : null}
+              </View>
+              <View style={styles.entryBody}>
+                <StickerCard>
+                  <Text style={styles.prompt}>{slot.promptText}</Text>
+                  <Text style={styles.meta}>
+                    Status: {slot.status} {slot.promptType === "creative_hint" ? "• Creative Hint" : ""}
+                  </Text>
+                </StickerCard>
+              </View>
+            </View>
+          ))}
 
-        {photos.length > 0 && (
-          <Pressable onPress={handleDeleteAll} style={styles.deleteButton}>
-            <Text style={styles.deleteButtonText}>Delete All Entries</Text>
-          </Pressable>
-        )}
+          {photos.length > 0 ? (
+            <Pressable onPress={handleDeleteAll} style={styles.deleteButton}>
+              <Text style={styles.deleteButtonText}>Delete All Entries</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -97,15 +119,18 @@ export function TimelineScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    padding: 12,
-    gap: 20
+    paddingVertical: 16,
+    paddingHorizontal: 12
+  },
+  column: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    gap: 14
   },
   header: {
     gap: 6,
-    marginBottom: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    marginBottom: 8
   },
   badge: {
     alignSelf: "flex-start",
@@ -131,11 +156,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.mutedText
   },
+  timelineRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8
+  },
+  timeColumn: {
+    width: 78,
+    alignItems: "flex-end",
+    position: "relative",
+    paddingTop: 2,
+    paddingBottom: 8,
+    paddingRight: 10
+  },
   slotTime: {
-    fontSize: 12,
-    color: theme.colors.primary,
+    fontSize: 11,
+    color: theme.colors.mutedText,
     fontWeight: "700",
-    marginBottom: 4
+    marginBottom: 8
+  },
+  node: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: theme.colors.primary,
+    borderWidth: 2,
+    borderColor: theme.colors.surface
+  },
+  connector: {
+    position: "absolute",
+    right: 13,
+    top: 30,
+    bottom: -12,
+    width: 2,
+    backgroundColor: theme.colors.border
+  },
+  entryBody: {
+    flex: 1
   },
   prompt: {
     fontSize: 17,
@@ -147,50 +204,9 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 300,
     borderRadius: theme.radius.md,
-    borderColor: theme.colors.text,
+    borderColor: theme.colors.border,
     borderWidth: 2,
-    backgroundColor: theme.colors.surface,
-  },
-  cardOverride: {
-    padding: 0,
-    paddingTop: 16,
-    paddingBottom: 24,
-    paddingHorizontal: 0,
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  deleteButton: {
-    marginTop: 40,
-    marginBottom: 60,
-    backgroundColor: "#fee2e2",
-    padding: 16,
-    borderRadius: theme.radius.lg,
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#ef4444"
-  },
-  deleteButtonText: {
-    color: "#b91c1c",
-    fontWeight: "800",
-    fontSize: 16
-  },
-  debugButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: "#eee",
-    borderWidth: 1,
-    borderColor: "#ccc"
-  },
-  debugButtonActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.text
-  },
-  debugButtonText: {
-    fontSize: 10,
-    fontWeight: "bold"
+    backgroundColor: theme.colors.surface
   },
   unmirror: {
     transform: [{ scaleX: -1 }]
@@ -199,10 +215,25 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 12,
     color: theme.colors.mutedText,
-    backgroundColor: "#f4f3ff",
+    backgroundColor: "#f2e9d8",
     borderRadius: 999,
     alignSelf: "flex-start",
     paddingHorizontal: 10,
     paddingVertical: 4
+  },
+  deleteButton: {
+    marginTop: 28,
+    marginBottom: 50,
+    backgroundColor: "#edd8cf",
+    padding: 14,
+    borderRadius: theme.radius.lg,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#b9856b"
+  },
+  deleteButtonText: {
+    color: theme.colors.text,
+    fontWeight: "800",
+    fontSize: 15
   }
 });
