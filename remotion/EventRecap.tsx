@@ -5,32 +5,36 @@ import {
   interpolate,
   Sequence,
   useCurrentFrame,
+  staticFile,
 } from "remotion";
 
-interface PhotoSlide {
+export type PhotoSlide = {
   url: string;
   participantName: string;
+  participantId?: string;
   timestamp: string;
   width?: number;
   height?: number;
-}
+};
 
-interface WrappedStats {
+type WrappedStats = {
   photoStreak: number;
   totalPhotos: number;
   mostOnTime: string; // e.g. "2 seconds" or "within 1 minute"
   mostActiveCity: string;
   citiesVisited: number;
-}
+};
 
-interface EventRecapProps {
+export type EventRecapProps = {
+  eventId: string;
   eventTitle: string;
   eventCity: string;
   eventDate: string;
   photos: PhotoSlide[];
   participants: string[];
+  allMembers?: { _id: string, name: string }[];
   wrappedStats?: WrappedStats;
-}
+};
 
 const FRAMES_PER_SLIDE = 90; // 3 seconds
 const INTRO_FRAMES = 90;
@@ -58,7 +62,7 @@ const IntroSlide: React.FC<{
   return (
     <AbsoluteFill
       style={{
-        background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+        background: "linear-gradient(135deg, #fdf4f8 0%, #ffe7a8 50%, #f7a8c8 100%)",
         justifyContent: "center",
         alignItems: "center",
         opacity,
@@ -75,12 +79,12 @@ const IntroSlide: React.FC<{
       >
         <div
           style={{
-            background: "rgba(255,255,255,0.15)",
+            background: "rgba(76, 74, 104, 0.15)",
             borderRadius: 999,
             padding: "8px 20px",
             fontSize: 18,
             fontWeight: 700,
-            color: "#e0d5c0",
+            color: "#4c4a68",
             letterSpacing: 2,
             textTransform: "uppercase" as const,
           }}
@@ -91,7 +95,7 @@ const IntroSlide: React.FC<{
           style={{
             fontSize: 64,
             fontWeight: 800,
-            color: "#ffffff",
+            color: "#4c4a68",
             textAlign: "center" as const,
             lineHeight: 1.1,
             maxWidth: 800,
@@ -102,7 +106,7 @@ const IntroSlide: React.FC<{
         <div
           style={{
             fontSize: 28,
-            color: "#c4b89a",
+            color: "#7a7894",
             fontWeight: 600,
           }}
         >
@@ -111,7 +115,7 @@ const IntroSlide: React.FC<{
         <div
           style={{
             fontSize: 22,
-            color: "rgba(255,255,255,0.6)",
+            color: "rgba(76, 74, 104, 0.6)",
             marginTop: 16,
           }}
         >
@@ -124,7 +128,7 @@ const IntroSlide: React.FC<{
 
 /* ─── Stacked Grid Slide — full-width rows like feed ───────── */
 const GridSlide: React.FC<{
-  photos: PhotoSlide[];
+  photos: (PhotoSlide | null)[];
   timestamp: string;
 }> = ({ photos, timestamp }) => {
   const frame = useCurrentFrame();
@@ -138,18 +142,66 @@ const GridSlide: React.FC<{
     minute: "2-digit",
   });
 
+  const count = photos.length; // photos array has exactly the number of slots we need to render
+
+  const renderGrid = () => {
+    if (count === 1) {
+      return photos[0] ? renderPhoto(photos[0], { width: "100%", height: "100%" }) : renderEmptySlot({ width: "100%", height: "100%" });
+    }
+    if (count === 2) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", gap: 0 }}>
+          {photos[0] ? renderPhoto(photos[0], { width: "100%", flex: 1 }) : renderEmptySlot({ width: "100%", flex: 1 })}
+          {photos[1] ? renderPhoto(photos[1], { width: "100%", flex: 1 }) : renderEmptySlot({ width: "100%", flex: 1 })}
+        </div>
+      );
+    }
+    if (count === 3) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", gap: 0 }}>
+          {/* Top row: 1 large photo */}
+          {photos[0] ? renderPhoto(photos[0], { width: "100%", flex: 1 }) : renderEmptySlot({ width: "100%", flex: 1 })}
+          
+          {/* Bottom row: 2 split photos */}
+          <div style={{ display: "flex", flex: 1, gap: 0 }}>
+            {photos[1] ? renderPhoto(photos[1], { flex: 1, height: "100%" }) : renderEmptySlot({ flex: 1, height: "100%" })}
+            {photos[2] ? renderPhoto(photos[2], { flex: 1, height: "100%" }) : renderEmptySlot({ flex: 1, height: "100%" })}
+          </div>
+        </div>
+      );
+    }
+    // 4 or more
+    return (
+      <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", gap: 0 }}>
+        <div style={{ display: "flex", flex: 1, gap: 0 }}>
+          {photos[0] ? renderPhoto(photos[0], { flex: 1, height: "100%" }) : renderEmptySlot({ flex: 1, height: "100%" })}
+          {photos[1] ? renderPhoto(photos[1], { flex: 1, height: "100%" }) : renderEmptySlot({ flex: 1, height: "100%" })}
+        </div>
+        <div style={{ display: "flex", flex: 1, gap: 0 }}>
+          {photos[2] ? renderPhoto(photos[2], { flex: 1, height: "100%" }) : renderEmptySlot({ flex: 1, height: "100%" })}
+          {photos[3] ? renderPhoto(photos[3], { flex: 1, height: "100%" }) : renderEmptySlot({ flex: 1, height: "100%" })}
+        </div>
+      </div>
+    );
+  };
   const renderPhoto = (photo: PhotoSlide, containerStyle: React.CSSProperties) => {
     return (
       <div
         style={{
           ...containerStyle,
           position: "relative",
-          overflow: "hidden"
+          overflow: "hidden",
+          backgroundColor: "#e6dcf7",
         }}
       >
         <Img
           src={photo.url}
           style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             width: "100%",
             height: "100%",
             objectFit: "cover",
@@ -161,11 +213,11 @@ const GridSlide: React.FC<{
             bottom: 0,
             left: 0,
             right: 0,
-            padding: "8px 14px",
-            background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
+            padding: "16px 14px 10px 14px",
+            background: "linear-gradient(transparent, rgba(76,74,104,0.85))",
           }}
         >
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#fff" }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", textShadow: "0px 2px 4px rgba(0,0,0,0.5)" }}>
             {photo.participantName}
           </div>
         </div>
@@ -192,18 +244,34 @@ const GridSlide: React.FC<{
         gap: 2
       };
 
+  const renderEmptySlot = (containerStyle: React.CSSProperties) => {
+    return (
+      <div
+        style={{
+          ...containerStyle,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#e6dcf7", // App border color
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ fontSize: 40, marginBottom: 16 }}>👻</div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: "#7a7894", textAlign: "center" }}>
+          no image :(
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <AbsoluteFill
-      style={{
-        opacity,
-        background: "#0a0a1a",
-        padding: 16
-      }}
-    >
+    <AbsoluteFill style={{ opacity, backgroundColor: "#fdf4f8", padding: 0 }}>
       <div
         style={{
           position: "absolute",
-          top: "50%",
+          top: 60,
           left: 0,
           right: 0,
           zIndex: 10,
@@ -213,26 +281,38 @@ const GridSlide: React.FC<{
       >
         <div
           style={{
-            background: "rgba(0,0,0,0.6)",
+            background: "#4c4a68",
             borderRadius: 999,
-            padding: "10px 24px",
-            fontSize: 34,
+            padding: "8px 24px",
+            fontSize: 24,
             fontWeight: 800,
             color: "#fff",
-            transform: "translateY(-50%)",
-            border: "2px solid rgba(255,255,255,0.22)"
+            boxShadow: "0 4px 12px rgba(76, 74, 104, 0.5)",
           }}
         >
           {timeStr}
         </div>
       </div>
-      <div style={{ flex: 1, paddingBottom: PLAYER_CONTROLS_SAFE_BOTTOM }}>
-        <div style={gridStyle}>
-          {slidePhotos.map((photo) =>
-            renderPhoto(photo, { width: "100%", height: "100%" })
-          )}
-        </div>
+      <div style={{ flex: 1, margin: 0 }}>
+        {renderGrid()}
       </div>
+
+      {/* Custom Overlay Image */}
+      <Img
+        src={staticFile("images/overlay.png")}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          pointerEvents: "none",
+          zIndex: 20
+        }}
+      />
     </AbsoluteFill>
   );
 };
@@ -340,7 +420,7 @@ const OutroSlide: React.FC<{ participants: string[] }> = ({ participants }) => {
   return (
     <AbsoluteFill
       style={{
-        background: "linear-gradient(135deg, #0f3460 0%, #1a1a2e 100%)",
+        background: "linear-gradient(135deg, #a9d8ff 0%, #fdf4f8 50%, #f7a8c8 100%)",
         justifyContent: "center",
         alignItems: "center",
         opacity,
@@ -354,13 +434,13 @@ const OutroSlide: React.FC<{ participants: string[] }> = ({ participants }) => {
           gap: 32,
         }}
       >
-        <div style={{ fontSize: 48, fontWeight: 800, color: "#ffffff" }}>
+        <div style={{ fontSize: 56, fontWeight: 800, color: "#4c4a68" }}>
           That's a wrap! 🎬
         </div>
         <div
           style={{
-            fontSize: 22,
-            color: "rgba(255,255,255,0.5)",
+            fontSize: 24,
+            color: "#7a7894",
             textAlign: "center" as const,
             maxWidth: 600,
           }}
@@ -370,11 +450,14 @@ const OutroSlide: React.FC<{ participants: string[] }> = ({ participants }) => {
         <div
           style={{
             marginTop: 40,
-            fontSize: 18,
-            color: "#c4b89a",
-            fontWeight: 700,
+            fontSize: 20,
+            color: "#4c4a68",
+            fontWeight: 800,
             letterSpacing: 3,
             textTransform: "uppercase" as const,
+            padding: "10px 24px",
+            backgroundColor: "rgba(255,255,255,0.5)",
+            borderRadius: 999,
           }}
         >
           DAY IN THE LIFE
@@ -391,20 +474,50 @@ export const EventRecap: React.FC<EventRecapProps> = ({
   eventDate,
   photos,
   participants,
+  allMembers,
   wrappedStats,
 }) => {
-  // Group photos by fixed-size chunks so each slide consistently shows up to 4 images.
-  const timeGroups: { timestamp: string; photos: PhotoSlide[] }[] = [];
-  for (let i = 0; i < photos.length; i += 4) {
-    const chunk = photos.slice(i, i + 4);
-    if (chunk.length) {
-      timeGroups.push({
-        timestamp: chunk[0].timestamp,
-        photos: chunk
+  // Group photos by hour into a map
+  const hourMap: Record<string, { timestamp: string; photos: PhotoSlide[] }> = {};
+  for (const photo of photos) {
+    if (!photo) continue;
+    const d = new Date(photo.timestamp);
+    const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+    if (!hourMap[k]) {
+      const groupTime = new Date(d);
+      groupTime.setMinutes(0, 0, 0);
+      hourMap[k] = { timestamp: groupTime.toISOString(), photos: [] };
+  // Define actual members to slot ratio. If allMembers isn't passed, fallback to 1 member to prevent crashing.
+  const membersList = allMembers && allMembers.length > 0 ? allMembers : [{ _id: "unknown", name: "Member" }];
+
+  // For every active hour, create a slot for EVERY member (null if they skipped)
+  const timeGroups: { timestamp: string; photos: (PhotoSlide | null)[] }[] = [];
+  
+  for (const group of Object.values(hourMap)) {
+    // Array size exactly equals number of event members
+    const groupSlots: (PhotoSlide | null)[] = new Array(membersList.length).fill(null);
+    for (const photo of group.photos) {
+      // Find where this participant belongs in the grid
+      const memberIndex = membersList.findIndex(m => m._id === photo.participantId);
+      if (memberIndex !== -1) {
+        groupSlots[memberIndex] = photo;
+      }
+    }
+    timeGroups.push({ timestamp: group.timestamp, photos: groupSlots });
+  }
+
+  // If there are more than 4 members, split the arrays into chunks of 4.
+  const splitGroups: { timestamp: string, photos: (PhotoSlide | null)[] }[] = [];
+  for (const group of timeGroups) {
+    for (let i = 0; i < group.photos.length; i += 4) {
+      splitGroups.push({
+        timestamp: group.timestamp,
+        photos: group.photos.slice(i, i + 4)
       });
     }
   }
-
+  timeGroups.length = 0;
+  timeGroups.push(...splitGroups);
   // Build wrapped slides
   const wrappedSlides: { emoji: string; label: string; bigValue: string; subtitle: string; gradient: string }[] = [];
 

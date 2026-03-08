@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
@@ -101,6 +102,27 @@ export function ProfileScreen() {
     setEditBio(userBio);
     setEditModalVisible(true);
   };
+
+  const handleDeleteVideo = async () => {
+    if (!playingVideo) return;
+    try {
+      const res = await fetch(apiUrl(`/api/videos?id=${playingVideo._id}`), {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setPlayingVideo(null);
+        fetchVideos();
+      }
+    } catch (error) {
+      console.error("Failed to delete video", error);
+    }
+  };
+
+  // Video player configuration for cross-platform playback
+  const player = useVideoPlayer(playingVideo?.video_url || null, (player) => {
+    player.loop = false;
+    player.play();
+  });
 
   useEffect(() => {
     fetchUser();
@@ -267,26 +289,31 @@ export function ProfileScreen() {
           >
             <View style={styles.videoModalOverlay}>
               <View style={styles.videoModalCard}>
-                {playingVideo && Platform.OS === "web" ? (
-                  <video
-                    src={playingVideo.video_url}
-                    controls
-                    autoPlay
+                {playingVideo ? (
+                  <VideoView
+                    player={player}
+                    allowsFullscreen
+                    allowsPictureInPicture
                     style={{
                       width: "100%",
-                      maxHeight: "70vh",
+                      aspectRatio: 9 / 16,
+                      maxHeight: "75%",
                       borderRadius: 16,
                       backgroundColor: "#000",
-                    } as any}
+                    }}
                   />
-                ) : playingVideo ? (
-                  <Text style={{ color: "#fff", textAlign: "center" }}>Video playback requires a native player.</Text>
                 ) : null}
                 <Text style={styles.videoModalTitle}>{playingVideo?.title}</Text>
                 <Text style={styles.videoModalMeta}>{playingVideo?.event_city} • {playingVideo?.photo_count} photos</Text>
-                <Pressable onPress={() => setPlayingVideo(null)} style={styles.videoModalClose}>
-                  <Text style={styles.videoModalCloseText}>Close</Text>
-                </Pressable>
+                
+                <View style={styles.videoModalActions}>
+                  <Pressable onPress={() => setPlayingVideo(null)} style={styles.videoModalClose}>
+                    <Text style={styles.videoModalActionText}>Close</Text>
+                  </Pressable>
+                  <Pressable onPress={handleDeleteVideo} style={styles.videoModalDelete}>
+                    <Text style={[styles.videoModalActionText, { color: "#ef4444" }]}>Delete</Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
           </Modal>
@@ -573,14 +600,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255,255,255,0.6)",
   },
-  videoModalClose: {
+  videoModalActions: {
+    flexDirection: "row",
+    gap: 12,
     marginTop: 8,
+  },
+  videoModalClose: {
     backgroundColor: "rgba(255,255,255,0.15)",
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 999,
   },
-  videoModalCloseText: {
+  videoModalDelete: {
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  videoModalActionText: {
     color: "#ffffff",
     fontWeight: "700",
     fontSize: 15,

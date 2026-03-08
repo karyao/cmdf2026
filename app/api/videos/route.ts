@@ -39,3 +39,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch videos" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing video ID" }, { status: 400 });
+    }
+
+    const deleted = await Video.findByIdAndDelete(id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/videos failed:", error);
+    return NextResponse.json({ error: "Failed to delete video" }, { status: 500 });
+  }
+}

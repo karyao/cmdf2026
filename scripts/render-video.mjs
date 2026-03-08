@@ -32,12 +32,27 @@ async function main() {
   }
 
   const input = JSON.parse(inputJson);
-  const { eventId, eventTitle, eventCity, eventDate, photos, participants, wrappedStats } = input;
+  const { eventId, eventTitle, eventCity, eventDate, photos, participants, allMembers, wrappedStats } = input;
 
-  // The composition groups photos into grid slides of up to 4
   const WRAPPED_SLIDE_COUNT = wrappedStats ? 3 : 0;
   const WRAPPED_FRAMES = 120;
-  const gridSlideCount = Math.max(1, Math.ceil(photos.length / 4));
+  
+  // Group photos by hour to determine how many hours have ANY photos
+  const hourGroups = {};
+  for (const p of photos) {
+    if (!p) continue;
+    const d = new Date(p.timestamp);
+    const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+    hourGroups[k] = true;
+  }
+  
+  const numActiveHours = Object.keys(hourGroups).length;
+  const membersCount = allMembers?.length || 1;
+  const slidesPerHour = Math.ceil(membersCount / 4);
+  
+  let gridSlideCount = numActiveHours * slidesPerHour;
+  gridSlideCount = Math.max(1, gridSlideCount);
+
   const totalFrames = INTRO_FRAMES + gridSlideCount * FRAMES_PER_SLIDE + WRAPPED_SLIDE_COUNT * WRAPPED_FRAMES + OUTRO_FRAMES;
 
   const entryPoint = path.join(projectRoot, "remotion", "index.tsx");
@@ -51,6 +66,7 @@ async function main() {
     eventDate,
     photos,
     participants,
+    allMembers,
     wrappedStats,
   };
 

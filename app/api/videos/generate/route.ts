@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Media } from "@/lib/models/Media";
 import { Event } from "@/lib/models/Event";
 import { Video } from "@/lib/models/Video";
+import { User } from "@/lib/models/User";
 import { execFile } from "child_process";
 import path from "path";
 
@@ -36,14 +37,20 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Fetch event info
-    const event = await Event.findById(eventId).lean();
+    // Fetch event info and its members
+    const event = await Event.findById(eventId).populate("members").lean();
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Fetch all photos for this event
+    const allMembers = ((event as any).members || []).map((m: any) => ({
+      _id: String(m._id),
+      name: String(m._id) === String(userId || "000000000000000000000001") ? "You" : (m.name || "Member")
+    }));
+
+    // Fetch all photos for this event and populate user info for real names
     const photos = await Media.find({ event_id: eventId, media_type: "photo" })
+      .populate("user_id", "name")
       .sort({ timestamp: 1 })
       .lean();
 
@@ -69,24 +76,24 @@ export async function POST(request: NextRequest) {
     const photoSlides = photos.map((p: any) => {
       let url = p.media_url;
       if (url.startsWith("/")) url = `${baseUrl}${url}`;
-      const ownerId = p.user_id ? String(p.user_id) : "";
+      const ownerId = p.user_id ? String(p.user_id?._id || p.user_id) : "";
       return {
         url,
-        participantName: participantNameById.get(ownerId) ?? (ownerId === requestingUserId ? "You" : "Member"),
+        participantId: ownerId,
+        participantName: participantNameById.get(ownerId) ?? (ownerId === requestingUserId ? "You" : (p.user_id?.name || "Member")),
         timestamp: p.timestamp?.toISOString?.() ?? new Date(p.timestamp).toISOString(),
         width: p.width,
         height: p.height,
       };
     });
-
     const participants = memberIds.length
-      ? memberIds.map((id) => participantNameById.get(id) ?? "Member")
-      : [...new Set(photos.map((p: any) => String(p.user_id)))].map((id) =>
+      ? memberIds.map((id: string) => participantNameById.get(id) ?? "Member")
+      : [...new Set(photos.map((p: any) => String(p.user_id?._id || p.user_id)))].map((id: string) =>
           id === requestingUserId ? "You" : "Member"
         );
 
     // If event members have not uploaded yet, add sample photos so recap shows everyone.
-    const existingPhotoOwnerIds = new Set(photos.map((p: any) => String(p.user_id)));
+    const existingPhotoOwnerIds = new Set(photos.map((p: any) => String(p.user_id?._id || p.user_id)));
     let sampleIdx = 0;
     const baseTimestampMs = photos.length
       ? new Date((photos as any[])[photos.length - 1].timestamp).getTime()
@@ -98,6 +105,7 @@ export async function POST(request: NextRequest) {
       sampleIdx += 1;
       photoSlides.push({
         url: `${baseUrl}${samplePath}`,
+        participantId: memberId,
         participantName: participantNameById.get(memberId) ?? "Member",
         timestamp: new Date(baseTimestampMs + sampleIdx * 60_000).toISOString(),
         width: null,
@@ -114,6 +122,7 @@ export async function POST(request: NextRequest) {
       const samplePath = SAMPLE_MEMBER_IMAGES[(sampleIdx + idx) % SAMPLE_MEMBER_IMAGES.length];
       return {
         url: `${baseUrl}${samplePath}`,
+        participantId: `dummy-${idx}`,
         participantName: name,
         timestamp: new Date(baseTs + (idx + 1) * 90_000).toISOString(),
         width: null,
@@ -185,7 +194,20 @@ export async function POST(request: NextRequest) {
 
     const WRAPPED_SLIDE_COUNT = 3;
     const WRAPPED_FRAMES_PER = 120;
-    const gridSlideCount = Math.max(1, Math.ceil(orderedPhotoSlides.length / 4));
+    // Group photos by hour to determine grid slide count
+    const hourGroups: Record<string, number> = {};
+    for (const p of orderedPhotoSlides) {
+      if (!p) continue;
+      const d = new Date(p.timestamp);
+      const k = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+      hourGroups[k] = (hourGroups[k] || 0) + 1;
+    }
+    const numActiveHours = Object.keys(hourGroups).length;
+    const membersCount = allMembers?.length || 1;
+    const slidesPerHour = Math.ceil(membersCount / 4);
+    
+    let gridSlideCount = numActiveHours * slidesPerHour;
+    gridSlideCount = Math.max(1, gridSlideCount);
     const totalFrames = INTRO_FRAMES + gridSlideCount * FRAMES_PER_PHOTO + WRAPPED_SLIDE_COUNT * WRAPPED_FRAMES_PER + OUTRO_FRAMES;
     const durationSeconds = totalFrames / FPS;
 
@@ -197,6 +219,7 @@ export async function POST(request: NextRequest) {
       eventDate: (event as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
       photos: orderedPhotoSlides,
       participants,
+      allMembers,
       wrappedStats,
     });
 
