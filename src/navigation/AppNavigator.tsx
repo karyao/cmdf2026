@@ -16,6 +16,7 @@ function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: "#8a88a8",
         tabBarStyle: {
@@ -40,9 +41,6 @@ function MainTabs() {
         tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: "700", marginBottom: 2 },
         tabBarActiveBackgroundColor: "#f5f4ff",
-        headerStyle: { backgroundColor: "#fffdf7" },
-        headerShadowVisible: false,
-        headerTitleStyle: { color: theme.colors.text, fontWeight: "700" }
       }}
     >
       <Tab.Screen name="Timeline" component={TimelineScreen} />

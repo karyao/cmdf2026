@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
@@ -22,6 +22,30 @@ interface RecapVideo {
 export function ProfileScreen() {
   const [videos, setVideos] = useState<RecapVideo[]>([]);
   const [loadingVideos, setLoadingVideos] = useState(true);
+  const [playingVideo, setPlayingVideo] = useState<RecapVideo | null>(null);
+  const [photoCount, setPhotoCount] = useState(0);
+  const [eventCount, setEventCount] = useState(0);
+
+  // User profile state
+  const [userName, setUserName] = useState("Camille Yao");
+  const [userBio, setUserBio] = useState("");
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const fetchUser = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/user?userId=${DEMO_USER_ID}`));
+      const data = await res.json();
+      if (data.user) {
+        setUserName(data.user.name || "Camille Yao");
+        setUserBio(data.user.bio || "");
+      }
+    } catch (err) {
+      console.error("Failed to fetch user:", err);
+    }
+  }, []);
 
   const fetchVideos = useCallback(async () => {
     try {
@@ -35,9 +59,54 @@ export function ProfileScreen() {
     }
   }, []);
 
+  const fetchStats = useCallback(async () => {
+    try {
+      const [photosRes, eventsRes] = await Promise.all([
+        fetch(apiUrl(`/api/media?type=photo&userId=${DEMO_USER_ID}`)),
+        fetch(apiUrl(`/api/events?scope=all&userId=${DEMO_USER_ID}`)),
+      ]);
+      const photosData = await photosRes.json();
+      const eventsData = await eventsRes.json();
+      setPhotoCount(photosData.media?.length ?? 0);
+      const joined = (eventsData.events || []).filter((e: any) => e.joined);
+      setEventCount(joined.length);
+    } catch (err) {
+      console.error("Failed to fetch stats:", err);
+    }
+  }, []);
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(apiUrl("/api/user"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: DEMO_USER_ID, name: editName, bio: editBio }),
+      });
+      const data = await res.json();
+      if (data.user) {
+        setUserName(data.user.name);
+        setUserBio(data.user.bio);
+      }
+      setEditModalVisible(false);
+    } catch (err) {
+      console.error("Failed to save profile:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditModal = () => {
+    setEditName(userName);
+    setEditBio(userBio);
+    setEditModalVisible(true);
+  };
+
   useEffect(() => {
+    fetchUser();
     fetchVideos();
-  }, [fetchVideos]);
+    fetchStats();
+  }, [fetchUser, fetchVideos, fetchStats]);
 
   return (
     <Screen>
@@ -49,38 +118,77 @@ export function ProfileScreen() {
 
           <View style={styles.profileHeader}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>C</Text>
+              <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
             </View>
             <View style={styles.headerMeta}>
-              <Text style={styles.displayName}>Camille Yao</Text>
-              <Text style={styles.handle}>@camille</Text>
-              <Text style={styles.bio}>Design student documenting hourly moments in Vancouver.</Text>
+              <Text style={styles.displayName}>{userName}</Text>
+              <Text style={styles.handle}>@{userName.toLowerCase().replace(/\s+/g, "")}</Text>
+              {userBio ? <Text style={styles.bio}>{userBio}</Text> : null}
             </View>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statPill}>
-              <Text style={styles.statNum}>{videos.length}</Text>
-              <Text style={styles.statLabel}>Recaps</Text>
+              <Text style={styles.statNum}>{eventCount}</Text>
+              <Text style={styles.statLabel}>Events</Text>
             </View>
             <View style={styles.statPill}>
-              <Text style={styles.statNum}>1.2k</Text>
-              <Text style={styles.statLabel}>Followers</Text>
-            </View>
-            <View style={styles.statPill}>
-              <Text style={styles.statNum}>318</Text>
-              <Text style={styles.statLabel}>Following</Text>
+              <Text style={styles.statNum}>{photoCount}</Text>
+              <Text style={styles.statLabel}>Media</Text>
             </View>
           </View>
 
           <View style={styles.actionRow}>
-            <Pressable style={[styles.actionButton, styles.primaryAction]}>
+            <Pressable style={[styles.actionButton, styles.primaryAction]} onPress={openEditModal}>
               <Text style={styles.primaryActionText}>Edit Profile</Text>
             </Pressable>
             <Pressable style={[styles.actionButton, styles.secondaryAction]}>
               <Text style={styles.secondaryActionText}>Share</Text>
             </Pressable>
           </View>
+
+          {/* Edit Profile Modal */}
+          <Modal
+            visible={editModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setEditModalVisible(false)}
+          >
+            <View style={styles.editOverlay}>
+              <View style={styles.editCard}>
+                <Text style={styles.editTitle}>Edit Profile</Text>
+                <Text style={styles.editLabel}>Name</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Your name"
+                  placeholderTextColor="#999"
+                />
+                <Text style={styles.editLabel}>Bio</Text>
+                <TextInput
+                  style={[styles.editInput, styles.editBioInput]}
+                  value={editBio}
+                  onChangeText={setEditBio}
+                  placeholder="Tell us about yourself"
+                  placeholderTextColor="#999"
+                  multiline
+                />
+                <View style={styles.editActions}>
+                  <Pressable style={styles.editCancel} onPress={() => setEditModalVisible(false)}>
+                    <Text style={styles.editCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable style={styles.editSave} onPress={handleSaveProfile} disabled={saving}>
+                    {saving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.editSaveText}>Save</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           <View style={styles.sectionHead}>
             <Text style={styles.sectionTitle}>Highlights</Text>
@@ -121,33 +229,67 @@ export function ProfileScreen() {
                 });
 
                 return (
-                  <StickerCard key={video._id}>
-                    <View style={styles.videoCard}>
-                      {/* Video thumbnail / player area */}
-                      <View style={styles.videoPreview}>
-                        <Text style={styles.videoPlayIcon}>▶</Text>
-                        <Text style={styles.videoDuration}>
-                          {Math.floor(video.duration_seconds / 60)}:{String(video.duration_seconds % 60).padStart(2, "0")}
+                  <Pressable key={video._id} onPress={() => setPlayingVideo(video)}>
+                    <StickerCard>
+                      <View style={styles.videoCard}>
+                        <View style={styles.videoPreview}>
+                          <Text style={styles.videoPlayIcon}>▶</Text>
+                          <Text style={styles.videoDuration}>
+                            {Math.floor(video.duration_seconds / 60)}:{String(video.duration_seconds % 60).padStart(2, "0")}
+                          </Text>
+                        </View>
+                        <Text style={styles.videoTitle}>{video.title}</Text>
+                        <Text style={styles.videoMeta}>
+                          {video.event_city} • {dateStr} at {timeStr}
                         </Text>
-                      </View>
-                      <Text style={styles.videoTitle}>{video.title}</Text>
-                      <Text style={styles.videoMeta}>
-                        {video.event_city} • {dateStr} at {timeStr}
-                      </Text>
-                      <View style={styles.videoStats}>
-                        <View style={styles.videoStatPill}>
-                          <Text style={styles.videoStatText}>📸 {video.photo_count} photos</Text>
-                        </View>
-                        <View style={styles.videoStatPill}>
-                          <Text style={styles.videoStatText}>👥 {video.participants.length}</Text>
+                        <View style={styles.videoStats}>
+                          <View style={styles.videoStatPill}>
+                            <Text style={styles.videoStatText}>📸 {video.photo_count} photos</Text>
+                          </View>
+                          <View style={styles.videoStatPill}>
+                            <Text style={styles.videoStatText}>👥 {video.participants.length}</Text>
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  </StickerCard>
+                    </StickerCard>
+                  </Pressable>
                 );
               })}
             </View>
           )}
+
+          {/* Video Player Modal */}
+          <Modal
+            visible={Boolean(playingVideo)}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setPlayingVideo(null)}
+          >
+            <View style={styles.videoModalOverlay}>
+              <View style={styles.videoModalCard}>
+                {playingVideo && Platform.OS === "web" ? (
+                  <video
+                    src={playingVideo.video_url}
+                    controls
+                    autoPlay
+                    style={{
+                      width: "100%",
+                      maxHeight: "70vh",
+                      borderRadius: 16,
+                      backgroundColor: "#000",
+                    } as any}
+                  />
+                ) : playingVideo ? (
+                  <Text style={{ color: "#fff", textAlign: "center" }}>Video playback requires a native player.</Text>
+                ) : null}
+                <Text style={styles.videoModalTitle}>{playingVideo?.title}</Text>
+                <Text style={styles.videoModalMeta}>{playingVideo?.event_city} • {playingVideo?.photo_count} photos</Text>
+                <Pressable onPress={() => setPlayingVideo(null)} style={styles.videoModalClose}>
+                  <Text style={styles.videoModalCloseText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
 
           <View style={styles.list}>
             <Pressable style={styles.item}>
@@ -328,7 +470,7 @@ const styles = StyleSheet.create({
   },
   videoPreview: {
     width: "100%",
-    height: 180,
+    height: 280,
     borderRadius: theme.radius.lg,
     backgroundColor: "#1a1a2e",
     justifyContent: "center",
@@ -406,5 +548,114 @@ const styles = StyleSheet.create({
   itemMeta: {
     marginTop: 4,
     color: theme.colors.mutedText
-  }
+  },
+  // Video Player Modal
+  videoModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  videoModalCard: {
+    width: "100%",
+    maxWidth: 600,
+    alignItems: "center",
+    gap: 12,
+  },
+  videoModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#ffffff",
+    textAlign: "center",
+  },
+  videoModalMeta: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.6)",
+  },
+  videoModalClose: {
+    marginTop: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  videoModalCloseText: {
+    color: "#ffffff",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  // Edit Profile Modal
+  editOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  editCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#fff",
+    borderRadius: theme.radius.xl,
+    borderWidth: 2,
+    borderColor: theme.colors.text,
+    padding: 24,
+    gap: 12,
+  },
+  editTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: theme.colors.text,
+  },
+  editLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.colors.mutedText,
+    marginTop: 4,
+  },
+  editInput: {
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    fontSize: 16,
+    color: theme.colors.text,
+    backgroundColor: "#fafafa",
+  },
+  editBioInput: {
+    height: 80,
+    textAlignVertical: "top",
+  },
+  editActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+  },
+  editCancel: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: "#fff",
+  },
+  editCancelText: {
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
+  editSave: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primary,
+    borderWidth: 2,
+    borderColor: theme.colors.text,
+  },
+  editSaveText: {
+    fontWeight: "700",
+    color: theme.colors.text,
+  },
 });
