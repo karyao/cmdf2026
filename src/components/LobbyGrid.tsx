@@ -3,6 +3,7 @@ import { View, Image, Text, StyleSheet, Pressable } from "react-native";
 import { CameraType, CameraView } from "expo-camera";
 import { theme } from "../theme/theme";
 import { EventMember } from "../types/domain";
+import { apiUrl } from "../lib/api";
 
 interface EventPhoto {
   _id: string;
@@ -31,11 +32,17 @@ interface LobbyGridProps {
   onFlip?: () => void;
 }
 
-const REAL_PORTRAITS = [
-  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&h=600&fit=crop",
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&h=600&fit=crop",
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&h=600&fit=crop",
-  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=400&h=600&fit=crop",
+const SAMPLE_PORTRAITS = [
+  "/images/IMG_1450.jpeg",
+  "/images/IMG_1240.jpeg",
+  "/images/IMG_1485.jpeg",
+  "/images/IMG_0555.jpeg",
+  "/images/IMG_0559.jpeg",
+  "/images/IMG_0565.jpeg",
+  "/images/IMG_0540.jpeg",
+  "/images/IMG_1644.jpeg",
+  "/images/IMG_1501.jpeg",
+  "/images/IMG_1235.jpeg"
 ];
 
 export function LobbyGrid({
@@ -129,9 +136,8 @@ export function LobbyGrid({
     }
 
     // Other members or user who already submitted — show their photo or placeholder
-    const photoUrl = submittedPhoto
-      ?? (index < REAL_PORTRAITS.length ? REAL_PORTRAITS[index] : undefined)
-      ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.displayName}`;
+    const samplePath = SAMPLE_PORTRAITS[index % SAMPLE_PORTRAITS.length];
+    const photoUrl = submittedPhoto ?? apiUrl(samplePath);
 
     return (
       <View key={member.id} style={[styles.memberContainer, style]}>
