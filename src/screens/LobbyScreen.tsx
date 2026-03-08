@@ -511,45 +511,47 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 12,
     alignSelf: "flex-start",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: "#f1f5f9",
     borderWidth: 2,
-    borderColor: theme.colors.text,
+    borderColor: "#cbd5e1",
     paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderRadius: theme.radius.md
   },
   buttonText: {
-    color: theme.colors.text,
-    fontWeight: "700"
+    color: "#1f2937",
+    fontWeight: "700",
+    fontSize: 13
   },
   joinedButton: {
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#16a34a",
-    borderColor: "#125f33"
+    backgroundColor: "#dcfce7",
+    borderColor: "#86efac"
   },
   leaveButton: {
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#d14343",
-    borderColor: "#7b2222"
+    backgroundColor: "#fee2e2",
+    borderColor: "#fca5a5"
   },
   secondaryButton: {
-    backgroundColor: "#fff8c4",
-    borderColor: "#8c7a18"
+    backgroundColor: "#dbeafe",
+    borderColor: "#cbd5e1"
   },
   closeButton: {
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#e6e2ff",
-    borderColor: "#8a83c9"
+    backgroundColor: "#eef2f7",
+    borderColor: "#cbd5e1"
   },
   joinedButtonText: {
-    color: "#ffffff",
-    fontWeight: "800"
+    color: "#14532d",
+    fontWeight: "800",
+    fontSize: 13
   },
   modalOverlay: {
     flex: 1,
@@ -580,7 +582,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4
   },
   actionRail: {
-    width: 122,
+    width: 132,
     marginLeft: 10,
     gap: 8
   },
@@ -649,13 +651,13 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#7c3aed",
-    borderColor: "#5b21b6",
+    backgroundColor: "#dbeafe",
+    borderColor: "#93c5fd",
   },
   recapButtonText: {
-    color: "#ffffff",
+    color: "#1e3a8a",
     fontWeight: "800",
-    fontSize: 12,
+    fontSize: 13,
     textAlign: "center"
   },
   videoMessage: {
@@ -670,7 +672,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#16a34a",
-    borderColor: "#125f33"
+    backgroundColor: "#dcfce7",
+    borderColor: "#86efac"
   }
 });
