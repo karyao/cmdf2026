@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
@@ -24,6 +24,7 @@ export function TimelineScreen() {
           <StickerCard key={slot.id}>
             <Text style={styles.slotTime}>{new Date(slot.timestamp).toLocaleTimeString()}</Text>
             <Text style={styles.prompt}>{slot.promptText}</Text>
+            {slot.imageUrl ? <Image source={{ uri: slot.imageUrl }} style={styles.photo} /> : null}
             <Text style={styles.meta}>
               Status: {slot.status} {slot.promptType === "creative_hint" ? "• Creative Hint" : ""}
             </Text>
@@ -77,6 +78,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "600",
     color: theme.colors.text
+  },
+  photo: {
+    marginTop: 10,
+    width: "100%",
+    height: 220,
+    borderRadius: theme.radius.lg,
+    borderColor: theme.colors.border,
+    borderWidth: 2
   },
   meta: {
     marginTop: 8,
