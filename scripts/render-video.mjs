@@ -32,11 +32,13 @@ async function main() {
   }
 
   const input = JSON.parse(inputJson);
-  const { eventId, eventTitle, eventCity, eventDate, photos, participants } = input;
+  const { eventId, eventTitle, eventCity, eventDate, photos, participants, wrappedStats } = input;
 
   // The composition groups photos into grid slides of up to 4
+  const WRAPPED_SLIDE_COUNT = wrappedStats ? 3 : 0;
+  const WRAPPED_FRAMES = 120;
   const gridSlideCount = Math.max(1, Math.ceil(photos.length / 4));
-  const totalFrames = INTRO_FRAMES + gridSlideCount * FRAMES_PER_SLIDE + OUTRO_FRAMES;
+  const totalFrames = INTRO_FRAMES + gridSlideCount * FRAMES_PER_SLIDE + WRAPPED_SLIDE_COUNT * WRAPPED_FRAMES + OUTRO_FRAMES;
 
   const entryPoint = path.join(projectRoot, "remotion", "index.tsx");
 
@@ -49,6 +51,7 @@ async function main() {
     eventDate,
     photos,
     participants,
+    wrappedStats,
   };
 
   console.error("Selecting composition...");

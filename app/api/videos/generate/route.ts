@@ -55,18 +55,62 @@ export async function POST(request: NextRequest) {
       (id) => (id === (userId || "000000000000000000000001") ? "You" : "Member")
     );
 
+    // Compute Wrapped stats
+    // 1. Photo Streak — consecutive photos without missing
+    const photoStreak = photos.length; // All photos in event = streak
+
+    // 2. Most On Time — find fastest response time (smallest gap between photos)
+    let fastestMs = Infinity;
+    for (let i = 1; i < photos.length; i++) {
+      const prev = new Date((photos as any)[i - 1].timestamp).getTime();
+      const curr = new Date((photos as any)[i].timestamp).getTime();
+      const gap = Math.abs(curr - prev);
+      if (gap > 0 && gap < fastestMs) fastestMs = gap;
+    }
+    let mostOnTime = "Instant ⚡";
+    if (fastestMs < Infinity) {
+      const secs = Math.floor(fastestMs / 1000);
+      if (secs < 60) mostOnTime = `${secs} seconds`;
+      else if (secs < 3600) mostOnTime = `${Math.floor(secs / 60)} minutes`;
+      else mostOnTime = `${Math.floor(secs / 3600)} hours`;
+    }
+
+    // 3. Most Active City — from event data
+    const eventCity = (event as any).city || "Vancouver";
+
+    // Count all user events for city stats
+    const allEvents = await Event.find({ members: userId || "000000000000000000000001" }).lean();
+    const cityMap: Record<string, number> = {};
+    for (const e of allEvents as any[]) {
+      const c = e.city || "Vancouver";
+      cityMap[c] = (cityMap[c] || 0) + 1;
+    }
+    const mostActiveCity = Object.entries(cityMap).sort((a, b) => b[1] - a[1])[0]?.[0] || eventCity;
+    const citiesVisited = Object.keys(cityMap).length;
+
+    const wrappedStats = {
+      photoStreak,
+      totalPhotos: photos.length,
+      mostOnTime,
+      mostActiveCity,
+      citiesVisited,
+    };
+
+    const WRAPPED_SLIDE_COUNT = 3;
+    const WRAPPED_FRAMES_PER = 120;
     const gridSlideCount = Math.max(1, Math.ceil(photoSlides.length / 4));
-    const totalFrames = INTRO_FRAMES + gridSlideCount * FRAMES_PER_PHOTO + OUTRO_FRAMES;
+    const totalFrames = INTRO_FRAMES + gridSlideCount * FRAMES_PER_PHOTO + WRAPPED_SLIDE_COUNT * WRAPPED_FRAMES_PER + OUTRO_FRAMES;
     const durationSeconds = totalFrames / FPS;
 
     // Build input for the render script
     const scriptInput = JSON.stringify({
       eventId,
       eventTitle: (event as any).title,
-      eventCity: (event as any).city || "Vancouver",
+      eventCity,
       eventDate: (event as any).createdAt?.toISOString?.() ?? new Date().toISOString(),
       photos: photoSlides,
       participants,
+      wrappedStats,
     });
 
     // Spawn the render script in a separate Node process
