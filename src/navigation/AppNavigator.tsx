@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { Image, StyleSheet } from "react-native";
 import { RootStackParamList, RootTabParamList } from "./types";
 
 import { EventDetailsScreen } from "../screens/EventDetailsScreen";
@@ -11,11 +12,17 @@ import { theme } from "../theme/theme";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<RootTabParamList>();
+const TAB_ICONS = {
+  Timeline: require("../../public/navbar/timeline.png"),
+  Lobby: require("../../public/navbar/lobby.png"),
+  Wrapped: require("../../public/navbar/wrapped.png"),
+  Profile: require("../../public/navbar/profile.png")
+} as const;
 
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: "#8a88a8",
@@ -41,7 +48,10 @@ function MainTabs() {
         tabBarItemStyle: { borderRadius: 14, marginHorizontal: 3 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: "700", marginBottom: 2 },
         tabBarActiveBackgroundColor: "#f5f4ff",
-      }}
+        tabBarIcon: ({ color }) => (
+          <Image source={TAB_ICONS[route.name]} style={[styles.tabIcon, { tintColor: color }]} resizeMode="contain" />
+        ),
+      })}
     >
       <Tab.Screen name="Timeline" component={TimelineScreen} />
       <Tab.Screen name="Lobby" component={LobbyScreen} />
@@ -51,6 +61,13 @@ function MainTabs() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIcon: {
+    width: 18,
+    height: 18
+  }
+});
 
 export function AppNavigator() {
   return (

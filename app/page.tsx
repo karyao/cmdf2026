@@ -92,17 +92,19 @@ export default function HomePage() {
       {showSuccess && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
+          bottom: 'calc(env(safe-area-inset-bottom) + 16px)',
           left: '50%',
           transform: 'translateX(-50%)',
           backgroundColor: '#4ade80',
           color: '#166534',
-          padding: '12px 24px',
+          padding: '12px 20px',
           borderRadius: '999px',
           fontWeight: 'bold',
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
           zIndex: 50,
-          animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+          maxWidth: 'calc(100vw - 24px)',
+          textAlign: 'center'
         }}>
           ✅ Image saved to database!
         </div>

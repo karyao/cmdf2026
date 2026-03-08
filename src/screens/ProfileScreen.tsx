@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
@@ -134,13 +134,16 @@ export function ProfileScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.column}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>MY PROFILE</Text>
+          <View style={styles.headerRow}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>MY PROFILE</Text>
+            </View>
+            <Image source={require("../../public/logo.png")} style={styles.pageLogo} resizeMode="contain" />
           </View>
 
           <View style={styles.profileHeader}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
+              <Image source={{ uri: apiUrl("/profile/white.png") }} style={styles.avatarImage} resizeMode="cover" />
             </View>
             <View style={styles.headerMeta}>
               <Text style={styles.displayName}>{userName}</Text>
@@ -364,6 +367,16 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.6
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  pageLogo: {
+    width: 62,
+    height: 62,
+    marginLeft: 10
+  },
   profileHeader: {
     marginTop: 2,
     flexDirection: "row",
@@ -376,13 +389,12 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: theme.colors.text,
     backgroundColor: theme.colors.popYellow,
-    alignItems: "center",
-    justifyContent: "center"
+    overflow: "hidden"
   },
-  avatarText: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: theme.colors.text
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    transform: [{ scale: 1.4 }]
   },
   headerMeta: {
     flex: 1,

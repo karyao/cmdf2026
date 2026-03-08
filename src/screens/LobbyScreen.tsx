@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
@@ -73,6 +73,7 @@ export function LobbyScreen() {
   // Video generation state
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [videoMessage, setVideoMessage] = useState<string | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -356,16 +357,45 @@ export function LobbyScreen() {
     }
   };
 
+  const currentUserHasSubmitted = useMemo(
+    () => eventPhotos.some((p) => p.user_id === DEMO_USER_ID),
+    [eventPhotos]
+  );
+
+  const handleDeleteMyPhoto = useCallback(async () => {
+    if (!activeEventId || isDeletingPhoto) return;
+    setIsDeletingPhoto(true);
+    setVideoMessage(null);
+    try {
+      const res = await fetch(
+        apiUrl(`/api/media?userId=${DEMO_USER_ID}&eventId=${activeEventId}&type=photo`),
+        { method: "DELETE" }
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Failed to delete photo");
+      await loadEventPhotos(activeEventId);
+      setCapturedUri(null);
+      setCapturedBase64(null);
+      setDimensions(null);
+      setCapturedWithFrontCamera(false);
+      setDescription("");
+    } catch (err: any) {
+      setVideoMessage(`❌ ${err?.message ?? "Failed to delete photo"}`);
+    } finally {
+      setIsDeletingPhoto(false);
+    }
+  }, [activeEventId, isDeletingPhoto, loadEventPhotos]);
+
   const joinedEvent = events.find((e) => e.joined);
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.column}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>VANCOUVER LOBBY</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Events Lobby</Text>
+            <Image source={require("../../public/logo.png")} style={styles.pageLogo} resizeMode="contain" />
           </View>
-          <Text style={styles.title}>Events Lobby</Text>
           <Text style={styles.subtitle}>Create your own events or join others via code to meet people through prompts.</Text>
 
           <View style={styles.headerActions}>
@@ -555,6 +585,20 @@ export function LobbyScreen() {
                     </Pressable>
                   )}
 
+                  {activeEvent.joined && currentUserHasSubmitted && (
+                    <Pressable
+                      onPress={handleDeleteMyPhoto}
+                      disabled={isDeletingPhoto}
+                      style={[styles.button, styles.railButton, styles.deletePhotoButton]}
+                    >
+                      {isDeletingPhoto ? (
+                        <ActivityIndicator color="#ffffff" size="small" />
+                      ) : (
+                        <Text style={styles.joinedButtonText}>Delete My Photo</Text>
+                      )}
+                    </Pressable>
+                  )}
+
                   {activeEvent.joined ? (
                     <Pressable
                       onPress={() => toggleMembership(activeEvent)}
@@ -697,6 +741,16 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "800",
     color: theme.colors.text
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  pageLogo: {
+    width: 62,
+    height: 62,
+    marginLeft: 10
   },
   subtitle: {
     fontSize: 14,
@@ -891,6 +945,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#dbeafe",
     borderColor: "#93c5fd",
+  },
+  deletePhotoButton: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ef4444",
+    borderColor: "#b91c1c",
   },
   recapButtonText: {
     color: "#1e3a8a",

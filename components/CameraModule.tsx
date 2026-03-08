@@ -73,7 +73,7 @@ export function CameraModule({ prompt, onCapture, uploading }: CameraModuleProps
   }, [onCapture, previewImage, uploading]);
 
   return (
-    <section className="mb-5 rounded-3xl border border-rose-100 bg-white p-4 shadow-sm">
+    <section className="mb-4 rounded-3xl border border-rose-100 bg-white p-4 shadow-sm sm:mb-5">
       <div className="relative overflow-hidden rounded-2xl border border-rose-200 bg-rose-50">
         <span className="absolute left-3 top-2 text-lg">✨</span>
         <span className="absolute right-3 top-2 text-lg">🌼</span>
@@ -103,15 +103,15 @@ export function CameraModule({ prompt, onCapture, uploading }: CameraModuleProps
         )}
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <p className="line-clamp-2 text-xs text-slate-500">{prompt}</p>
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="line-clamp-2 text-xs text-slate-500 sm:max-w-[60%]">{prompt}</p>
         {previewImage ? (
-          <div className="flex gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex">
             <button
               type="button"
               onClick={retakePhoto}
               disabled={uploading}
-              className="rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-500 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-11 rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-500 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Take another
             </button>
@@ -119,7 +119,7 @@ export function CameraModule({ prompt, onCapture, uploading }: CameraModuleProps
               type="button"
               onClick={confirmPhoto}
               disabled={uploading}
-              className="rounded-full bg-rose-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_20px_-12px_rgba(244,63,94,0.9)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-h-11 rounded-full bg-rose-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_10px_20px_-12px_rgba(244,63,94,0.9)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Use photo
             </button>
@@ -129,7 +129,7 @@ export function CameraModule({ prompt, onCapture, uploading }: CameraModuleProps
             type="button"
             onClick={startCapture}
             disabled={uploading || countdown !== null || !!cameraError}
-            className="h-14 w-14 shrink-0 rounded-full border-4 border-white bg-rose-500 shadow-[0_10px_20px_-12px_rgba(244,63,94,0.9)] transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-16 w-16 shrink-0 self-end rounded-full border-4 border-white bg-rose-500 shadow-[0_10px_20px_-12px_rgba(244,63,94,0.9)] transition hover:scale-[1.02] sm:self-auto disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Capture photo"
           >
             <span className="block h-full w-full rounded-full border-2 border-rose-200" />

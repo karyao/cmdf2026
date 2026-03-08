@@ -143,7 +143,7 @@ export function LobbyGrid({
       <View key={member.id} style={[styles.memberContainer, style]}>
         <Image
           source={{ uri: photoUrl }}
-          style={styles.image}
+          style={[styles.image, isCurrentUser(member) && styles.mirrored]}
           resizeMode="cover"
         />
         <View style={styles.nameBadge}>

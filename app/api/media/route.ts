@@ -337,16 +337,33 @@ export async function DELETE(request: NextRequest) {
     
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
+    const eventId = searchParams.get("eventId");
+    const mediaType = searchParams.get("type");
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
-    // Define query: delete specific user's media
-    // If it's the demo user, also clear legacy null/orphaned entries to ensure a clean slate
+    // Event-scoped delete (used by demo retakes) should only affect this user's media in the given event.
+    if (eventId) {
+      const eventDeleteQuery: Record<string, unknown> = {
+        user_id: userId,
+        event_id: eventId
+      };
+      if (mediaType) eventDeleteQuery.media_type = mediaType;
+
+      const result = await Media.deleteMany(eventDeleteQuery);
+      return NextResponse.json({
+        message: `Deleted ${result.deletedCount} items in event`,
+        count: result.deletedCount
+      });
+    }
+
+    // Global delete fallback: delete specific user's media.
+    // If it's the demo user, also clear legacy null/orphaned entries to ensure a clean slate.
     const demoUserId = process.env.DEMO_USER_ID ?? "000000000000000000000001";
-    const deleteQuery = (userId === demoUserId) 
-      ? { $or: [{ user_id: userId }, { user_id: null }] } 
+    const deleteQuery = (userId === demoUserId)
+      ? { $or: [{ user_id: userId }, { user_id: null }] }
       : { user_id: userId };
 
     console.log("DEBUG: DELETE /api/media query:", JSON.stringify(deleteQuery));

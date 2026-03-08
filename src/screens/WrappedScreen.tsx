@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
@@ -8,10 +8,10 @@ export function WrappedScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.content}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>EVENT WRAPPED</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Event Wrapped</Text>
+            <Image source={require("../../public/logo.png")} style={styles.pageLogo} resizeMode="contain" />
           </View>
-          <Text style={styles.title}>Event Wrapped</Text>
           <Text style={styles.subtitle}>Spotify-style summary view placeholder</Text>
 
           <StickerCard>
@@ -63,6 +63,16 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "800",
     color: theme.colors.text
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  pageLogo: {
+    width: 62,
+    height: 62,
+    marginLeft: 10
   },
   subtitle: {
     color: theme.colors.mutedText

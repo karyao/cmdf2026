@@ -61,10 +61,10 @@ export function TimelineScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.column}>
           <View style={styles.header}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>DAY STRIP</Text>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>{activeEvent.title}</Text>
+              <Image source={require("../../public/logo.png")} style={styles.pageLogo} resizeMode="contain" />
             </View>
-            <Text style={styles.title}>{activeEvent.title}</Text>
             <Text style={styles.subtitle}>Day in the Life • {activeEvent.city}</Text>
             <AvatarStack members={activeEvent.members} />
           </View>
@@ -139,6 +139,16 @@ const styles = StyleSheet.create({
   header: {
     gap: 6,
     marginBottom: 8
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  pageLogo: {
+    width: 62,
+    height: 62,
+    marginLeft: 10
   },
   badge: {
     alignSelf: "flex-start",

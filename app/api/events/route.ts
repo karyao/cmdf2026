@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectToDatabase } from "@/lib/db";
 import { Event } from "@/lib/models/Event";
+import { Media } from "@/lib/models/Media";
 import { buildCorsHeaders } from "@/lib/cors";
 import { GoogleGenAI } from "@google/genai";
 
@@ -10,6 +11,65 @@ const ai = new GoogleGenAI({});
 
 const DEMO_USER_OBJECT_ID = process.env.DEMO_USER_ID ?? "000000000000000000000001";
 const ALT_DEMO_USER_OBJECT_ID = "000000000000000000000002";
+const DEMO_EVENT_TITLE = "Midnight Moodboard Club";
+const DEMO_EVENT_MEMBER_IDS = [
+  DEMO_USER_OBJECT_ID,
+  "000000000000000000000002",
+  "000000000000000000000003",
+  "000000000000000000000004"
+];
+
+const DEMO_EVENT_PROMPTS = [
+  "Show your desk vibe right now",
+  "Capture a cozy corner",
+  "Find one thing that sparks focus",
+  "Take a photo with warm lighting",
+  "Show your current snack or drink",
+  "Snap your best study face",
+  "Capture your keyboard or notebook texture",
+  "Find a small detail people usually miss",
+  "Show your view from where you sit",
+  "Take a photo that feels calm",
+  "Capture a candid in your space",
+  "End with your proudest shot"
+];
+
+async function ensureDemoEventMedia(eventId: string) {
+  const samplePhotos = [
+    { userId: "000000000000000000000002", mediaUrl: "/images/IMG_1450.jpeg", caption: "Locked in mode" },
+    { userId: "000000000000000000000003", mediaUrl: "/images/IMG_1240.jpeg", caption: "Coffee + focus" },
+    { userId: "000000000000000000000004", mediaUrl: "/images/IMG_1485.jpeg", caption: "Late-night grind" }
+  ];
+
+  await Promise.all(
+    samplePhotos.map((sample, index) =>
+      Media.updateOne(
+        {
+          event_id: eventId,
+          user_id: sample.userId,
+          media_type: "photo"
+        },
+        {
+          $setOnInsert: {
+            media_url: sample.mediaUrl,
+            thumbnail_url: sample.mediaUrl,
+            media_type: "photo",
+            user_id: sample.userId,
+            event_id: eventId,
+            prompt: DEMO_EVENT_PROMPTS[index % DEMO_EVENT_PROMPTS.length],
+            caption: sample.caption,
+            timestamp: new Date(Date.now() - (index + 1) * 15 * 60 * 1000),
+            width: 1080,
+            height: 1350,
+            mime_type: "image/jpeg",
+            is_private: false
+          }
+        },
+        { upsert: true }
+      )
+    )
+  );
+}
 
 async function ensureSeedEvents() {
   const seeds = [
@@ -28,16 +88,14 @@ async function ensureSeedEvents() {
       members: [ALT_DEMO_USER_OBJECT_ID]
     },
     {
-      title: "4-Person Focus Group",
-      city: "Burnaby",
+      title: DEMO_EVENT_TITLE,
+      city: "Vancouver",
       intervalMinutes: 45,
       createdBy: DEMO_USER_OBJECT_ID,
-      members: [
-        DEMO_USER_OBJECT_ID, 
-        "000000000000000000000003", 
-        "000000000000000000000004", 
-        "000000000000000000000005"
-      ]
+      members: DEMO_EVENT_MEMBER_IDS,
+      maxPeople: 4,
+      startTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      prompts: DEMO_EVENT_PROMPTS
     },
     {
       title: "Morning Coffee Duo",
@@ -66,13 +124,27 @@ async function ensureSeedEvents() {
             intervalMinutes: seed.intervalMinutes,
             type: "public",
             createdBy: seed.createdBy,
-            members: seed.members
+            members: seed.members,
+            maxPeople: (seed as any).maxPeople ?? 10,
+            startTime: (seed as any).startTime,
+            prompts: (seed as any).prompts ?? []
           }
         },
         { upsert: true }
       )
     )
   );
+
+  const demoEvent = await Event.findOne({
+    title: DEMO_EVENT_TITLE,
+    city: "Vancouver",
+    intervalMinutes: 45,
+    type: "public"
+  }).lean();
+
+  if (demoEvent?._id) {
+    await ensureDemoEventMedia(String(demoEvent._id));
+  }
 }
 
 function toUserId(candidate?: string | null) {

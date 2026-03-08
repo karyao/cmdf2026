@@ -17,7 +17,7 @@ export function TimelineFeed({ photos, loading }: TimelineFeedProps) {
   }
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-3 sm:space-y-4">
       {photos.map((photo, index) => (
         <PhotoCard key={photo._id} photo={photo} index={index} />
       ))}
