@@ -1,7 +1,6 @@
 export type RootTabParamList = {
   Timeline: undefined;
   Lobby: undefined;
-  Camera: undefined;
   Wrapped: undefined;
   Profile: undefined;
 };

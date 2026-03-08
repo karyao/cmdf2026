@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
@@ -17,13 +18,36 @@ interface LobbyEvent {
   members: string[];
 }
 
+interface EventPhoto {
+  _id: string;
+  media_url: string;
+  user_id: string | null;
+  prompt: string;
+  timestamp: string;
+  width?: number;
+  height?: number;
+}
+
 export function LobbyScreen() {
   const [events, setEvents] = useState<LobbyEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
-  const [testMemberCount, setTestMemberCount] = useState<number | null>(null);
+
+  // Camera state
+  const cameraRef = useRef<CameraView | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<CameraType>("front");
+  const [capturedUri, setCapturedUri] = useState<string | null>(null);
+  const [capturedBase64, setCapturedBase64] = useState<string | null | undefined>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [capturedWithFrontCamera, setCapturedWithFrontCamera] = useState(false);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  // Event photos state
+  const [eventPhotos, setEventPhotos] = useState<EventPhoto[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -39,70 +63,153 @@ export function LobbyScreen() {
           "API returned HTML instead of JSON. Run `npm run dev` and set EXPO_PUBLIC_API_BASE_URL=http://localhost:3000."
         );
       }
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to load events");
-      }
+      if (!response.ok) throw new Error(payload?.error ?? "Unknown error");
       setEvents(payload.events ?? []);
-    } catch (loadError: any) {
-      setError(loadError?.message ?? "Failed to load events");
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadEvents();
+    loadEvents();
   }, [loadEvents]);
 
-  const joinedEvent = useMemo(() => events.find((event) => event.joined), [events]);
-  const activeEvent = useMemo(
-    () => events.find((event) => event._id === activeEventId) ?? null,
-    [events, activeEventId]
-  );
+  const activeEvent = useMemo(() => events.find((e) => e._id === activeEventId) ?? null, [events, activeEventId]);
 
-  const activeMembers = useMemo((): EventMember[] => {
+  const activeMembers: EventMember[] = useMemo(() => {
     if (!activeEvent) return [];
-    
-    // Use testMemberCount if set, otherwise use real member count
-    const count = testMemberCount ?? (activeEvent.members || []).length;
-    
-    // If the API doesn't return full objects, mock some for the demo
-    return Array.from({ length: Math.max(count, 1) }).map((_, index) => {
-      const id = activeEvent.members[index] || `mock-${index}`;
-      return {
-        id,
-        displayName: id === DEMO_USER_ID ? "You (Karen)" : `Member ${index + 1}`,
-        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`
-      };
-    });
-  }, [activeEvent, testMemberCount]);
+    const count = activeEvent.members.length;
+    const dummyNames = ["Alex", "Jordan", "Morgan", "Taylor"];
+    return Array.from({ length: Math.min(count, 4) }).map((_, i) => ({
+      id: activeEvent.members[i] ?? `dummy-${i}`,
+      displayName: activeEvent.members[i] === DEMO_USER_ID ? "You" : dummyNames[i % dummyNames.length]
+    }));
+  }, [activeEvent]);
 
   const toggleMembership = useCallback(async (event: LobbyEvent) => {
     if (updatingId) return;
-
     setUpdatingId(event._id);
-    setError(null);
-
     try {
-      const method = event.joined ? "DELETE" : "POST";
-      const response = await fetch(apiUrl(`/api/events/${event._id}/membership?userId=${DEMO_USER_ID}`), {
-        method,
+      const endpoint = event.joined
+        ? apiUrl(`/api/events/${event._id}/leave`)
+        : apiUrl(`/api/events/${event._id}/join`);
+      const res = await fetch(endpoint, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: DEMO_USER_ID })
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to update membership");
+      if (!res.ok) {
+        const errPayload = await res.json().catch(() => null);
+        throw new Error(errPayload?.error ?? `HTTP ${res.status}`);
       }
-
-      const updatedEvent = payload.event as LobbyEvent;
-      setEvents((prev) => prev.map((item) => (item._id === updatedEvent._id ? updatedEvent : item)));
+      await loadEvents();
     } catch (membershipError: any) {
       setError(membershipError?.message ?? "Failed to update membership");
     } finally {
       setUpdatingId(null);
     }
   }, [updatingId]);
+
+  // Load event photos when opening a joined event
+  const loadEventPhotos = useCallback(async (eventId: string) => {
+    setLoadingPhotos(true);
+    try {
+      const res = await fetch(apiUrl(`/api/media?type=photo&eventId=${eventId}`));
+      const data = await res.json();
+      const photos = (data.media || []).filter((item: any) => {
+        const url = item.media_url || "";
+        return url.includes("/uploads/") || url.startsWith("data:image") || url.startsWith("http");
+      });
+      setEventPhotos(photos);
+    } catch (err) {
+      console.error("Failed to load event photos:", err);
+      setEventPhotos([]);
+    } finally {
+      setLoadingPhotos(false);
+    }
+  }, []);
+
+  // When modal opens on a joined event, fetch photos
+  useEffect(() => {
+    if (activeEvent?.joined && activeEventId) {
+      loadEventPhotos(activeEventId);
+    } else {
+      setEventPhotos([]);
+    }
+    // Reset camera state when modal changes
+    setCapturedUri(null);
+    setCapturedBase64(null);
+    setDimensions(null);
+  }, [activeEventId]);
+
+  // Camera functions
+  const handleCapture = async () => {
+    if (!cameraRef.current || isCapturing) return;
+    try {
+      setIsCapturing(true);
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.7 });
+      if (photo) {
+        setCapturedUri(photo.uri);
+        setCapturedBase64(photo.base64);
+        setDimensions({ width: photo.width, height: photo.height });
+        setCapturedWithFrontCamera(facing === "front");
+      }
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const handleRetake = () => {
+    setCapturedUri(null);
+    setCapturedBase64(null);
+    setDimensions(null);
+    setCapturedWithFrontCamera(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!capturedBase64 || !activeEventId) return;
+    setIsCapturing(true);
+    const imageData = `data:image/jpeg;base64,${capturedBase64}`;
+
+    try {
+      const res = await fetch(apiUrl("/api/media"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageData,
+          prompt: "Show your current moment.",
+          event_id: activeEventId,
+          userId: DEMO_USER_ID,
+          width: dimensions?.width,
+          height: dimensions?.height,
+          useCloud: false
+        })
+      });
+
+      if (res.ok) {
+        await loadEventPhotos(activeEventId);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+    } finally {
+      setCapturedUri(null);
+      setCapturedBase64(null);
+      setDimensions(null);
+      setIsCapturing(false);
+    }
+  };
+
+  const handleFlip = () => {
+    setFacing((f) => (f === "front" ? "back" : "front"));
+  };
+
+  const closeModal = () => {
+    setActiveEventId(null);
+  };
+
+  const joinedEvent = events.find((e) => e.joined);
 
   return (
     <Screen>
@@ -119,7 +226,6 @@ export function LobbyScreen() {
               <Text style={styles.joinedEyebrow}>YOU JOINED THIS EVENT</Text>
               <Text style={styles.eventTitle}>{joinedEvent.title}</Text>
               <Text style={styles.meta}>{joinedEvent.city} • Every {joinedEvent.intervalMinutes} min</Text>
-              <Text style={styles.joinedCopy}>Membership is synced to MongoDB for this demo user.</Text>
               <Pressable
                 disabled={updatingId === joinedEvent._id}
                 onPress={() => toggleMembership(joinedEvent)}
@@ -139,7 +245,7 @@ export function LobbyScreen() {
           {!loading && !events.length ? (
             <View style={styles.notice}>
               <Text style={styles.noticeTitle}>No Events Yet</Text>
-              <Text style={styles.noticeBody}>Create one via `POST /api/events` and it will appear here.</Text>
+              <Text style={styles.noticeBody}>Create one via POST /api/events and it will appear here.</Text>
             </View>
           ) : null}
 
@@ -177,10 +283,7 @@ export function LobbyScreen() {
         visible={Boolean(activeEvent)} 
         transparent 
         animationType="fade" 
-        onRequestClose={() => {
-          setActiveEventId(null);
-          setTestMemberCount(null);
-        }}
+        onRequestClose={closeModal}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -188,43 +291,62 @@ export function LobbyScreen() {
               <>
                 <Text style={styles.modalTitle}>{activeEvent.title}</Text>
                 <Text style={styles.meta}>{activeEvent.city} • Every {activeEvent.intervalMinutes} min</Text>
-                
-                <View style={styles.gridWrapper}>
-                  <LobbyGrid members={activeMembers} containerHeight={280} />
-                </View>
 
-                <Pressable 
-                  onPress={() => setTestMemberCount(prev => ((prev ?? activeMembers.length) % 4) + 1)}
-                  style={styles.testButton}
-                >
-                  <Text style={styles.testButtonText}>🧪 Cycle Layout: {activeMembers.length} People</Text>
-                </Pressable>
+                {loadingPhotos ? (
+                  <ActivityIndicator style={{ marginTop: 20 }} color={theme.colors.text} />
+                ) : (
+                  <View style={styles.gridWrapper}>
+                    <LobbyGrid
+                      members={activeMembers}
+                      containerHeight={320}
+                      isJoined={activeEvent.joined}
+                      currentUserId={DEMO_USER_ID}
+                      eventPhotos={eventPhotos}
+                      cameraRef={cameraRef}
+                      capturedUri={capturedUri}
+                      capturedWithFrontCamera={capturedWithFrontCamera}
+                      isCapturing={isCapturing}
+                      cameraPermission={permission}
+                      facing={facing}
+                      onRequestPermission={requestPermission}
+                      onCapture={handleCapture}
+                      onRetake={handleRetake}
+                      onSubmit={handleSubmit}
+                      onFlip={handleFlip}
+                    />
+                  </View>
+                )}
 
                 <Text style={styles.modalBody}>{activeEvent.memberCount} people joined this event.</Text>
-                <Text style={styles.modalBody}>
-                  Status: {activeEvent.joined ? "Joined" : "Not joined"}
-                </Text>
 
-                <Pressable
-                  onPress={() => toggleMembership(activeEvent)}
-                  disabled={updatingId === activeEvent._id}
-                  style={[styles.button, activeEvent.joined ? styles.leaveButton : styles.joinedButton]}
-                >
-                  {updatingId === activeEvent._id ? (
-                    <ActivityIndicator color="#ffffff" size="small" />
-                  ) : (
-                    <Text style={styles.joinedButtonText}>{activeEvent.joined ? "Unjoin Event" : "Join Event"}</Text>
-                  )}
-                </Pressable>
+                {activeEvent.joined ? (
+                  <Pressable
+                    onPress={() => toggleMembership(activeEvent)}
+                    disabled={updatingId === activeEvent._id}
+                    style={[styles.button, styles.leaveButton]}
+                  >
+                    {updatingId === activeEvent._id ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <Text style={styles.joinedButtonText}>Unjoin Event</Text>
+                    )}
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => toggleMembership(activeEvent)}
+                    disabled={updatingId === activeEvent._id}
+                    style={[styles.button, styles.joinedButton]}
+                  >
+                    {updatingId === activeEvent._id ? (
+                      <ActivityIndicator color="#ffffff" size="small" />
+                    ) : (
+                      <Text style={styles.joinedButtonText}>Join Event</Text>
+                    )}
+                  </Pressable>
+                )}
               </>
             ) : null}
-            <Pressable 
-              onPress={() => {
-                setActiveEventId(null);
-                setTestMemberCount(null);
-              }} 
-              style={[styles.button, styles.closeButton]}
-            >
+            <Pressable onPress={closeModal} style={[styles.button, styles.closeButton]}>
               <Text style={styles.buttonText}>Close</Text>
             </Pressable>
           </View>
@@ -298,10 +420,6 @@ const styles = StyleSheet.create({
   meta: {
     marginTop: 4,
     color: theme.colors.mutedText
-  },
-  joinedCopy: {
-    marginTop: 10,
-    color: theme.colors.text
   },
   button: {
     marginTop: 12,
@@ -390,18 +508,4 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  testButton: {
-    backgroundColor: "#fef3c7",
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#f59e0b",
-    alignSelf: "center",
-    marginBottom: 8,
-  },
-  testButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#b45309",
-  }
 });

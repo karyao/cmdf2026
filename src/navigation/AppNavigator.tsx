@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { RootStackParamList, RootTabParamList } from "./types";
-import { CameraScreen } from "../screens/CameraScreen";
+
 import { EventDetailsScreen } from "../screens/EventDetailsScreen";
 import { LobbyScreen } from "../screens/LobbyScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
@@ -47,7 +47,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Timeline" component={TimelineScreen} />
       <Tab.Screen name="Lobby" component={LobbyScreen} />
-      <Tab.Screen name="Camera" component={CameraScreen} />
+
       <Tab.Screen name="Wrapped" component={WrappedScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

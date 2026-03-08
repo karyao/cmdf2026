@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { theme } from "../theme/theme";
 import { useEventStore } from "../store/useEventStore";
+import { DEMO_USER_ID } from "../lib/api";
 
 export function CameraScreen() {
   const { activeEvent, markSlot } = useEventStore();
@@ -14,6 +15,7 @@ export function CameraScreen() {
   const [capturedBase64, setCapturedBase64] = useState<string | null | undefined>(null);
   const [capturedWithFrontCamera, setCapturedWithFrontCamera] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
   const openSlot = activeEvent.slots.find((slot) => slot.status === "window_open");
   const latestSubmitted = useMemo(
     () =>
@@ -34,6 +36,7 @@ export function CameraScreen() {
       });
       setCapturedUri(result?.uri ?? null);
       setCapturedBase64(result?.base64);
+      setDimensions(result ? { width: result.width, height: result.height } : null);
       setCapturedWithFrontCamera(facing === "front");
     } finally {
       setIsCapturing(false);
@@ -53,6 +56,10 @@ export function CameraScreen() {
         body: JSON.stringify({
           imageData,
           prompt: openSlot.promptText,
+          event_id: activeEvent.id,
+          userId: DEMO_USER_ID,
+          width: dimensions?.width,
+          height: dimensions?.height,
           useCloud: false
         })
       });
@@ -75,6 +82,7 @@ export function CameraScreen() {
     } finally {
       setCapturedUri(null);
       setCapturedBase64(null);
+      setDimensions(null);
       setCapturedWithFrontCamera(false);
       setIsCapturing(false);
     }

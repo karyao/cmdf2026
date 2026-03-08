@@ -23,7 +23,7 @@ const seedSlots: PromptSlot[] = Array.from({ length: 8 }).map((_, i) => {
 });
 
 const seedEvent: SocialEvent = {
-  id: "event-1",
+  id: "000000000000000000000009",
   title: "DT Vancouver Study Sprint",
   type: "public",
   city: "Vancouver",

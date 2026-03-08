@@ -1,11 +1,35 @@
-import React from "react";
-import { View, Image, Text, StyleSheet, Dimensions } from "react-native";
+import React, { RefObject } from "react";
+import { View, Image, Text, StyleSheet, Pressable } from "react-native";
+import { CameraType, CameraView } from "expo-camera";
 import { theme } from "../theme/theme";
 import { EventMember } from "../types/domain";
+
+interface EventPhoto {
+  _id: string;
+  media_url: string;
+  user_id: string | null;
+  prompt: string;
+  timestamp: string;
+}
 
 interface LobbyGridProps {
   members: EventMember[];
   containerHeight?: number;
+  // Camera integration (optional — only passed when event is joined)
+  isJoined?: boolean;
+  currentUserId?: string;
+  eventPhotos?: EventPhoto[];
+  cameraRef?: RefObject<CameraView | null>;
+  capturedUri?: string | null;
+  capturedWithFrontCamera?: boolean;
+  isCapturing?: boolean;
+  cameraPermission?: { granted: boolean } | null;
+  facing?: CameraType;
+  onRequestPermission?: () => void;
+  onCapture?: () => void;
+  onRetake?: () => void;
+  onSubmit?: () => void;
+  onFlip?: () => void;
 }
 
 const REAL_PORTRAITS = [
@@ -15,21 +39,110 @@ const REAL_PORTRAITS = [
   "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=400&h=600&fit=crop",
 ];
 
-/**
- * LobbyGrid renders a dynamic photo layout for 1-4 people.
- * - 1 person: Full image
- * - 2 people: Stacked vertically (50% height each)
- * - 3 people: Stacked vertically (33% height each)
- * - 4 people: 2x2 grid
- */
-export function LobbyGrid({ members, containerHeight = 400 }: LobbyGridProps) {
+export function LobbyGrid({
+  members,
+  containerHeight = 400,
+  isJoined,
+  currentUserId,
+  eventPhotos = [],
+  cameraRef,
+  capturedUri,
+  capturedWithFrontCamera,
+  isCapturing,
+  cameraPermission,
+  facing = "front",
+  onRequestPermission,
+  onCapture,
+  onRetake,
+  onSubmit,
+  onFlip,
+}: LobbyGridProps) {
   const count = Math.min(members.length, 4);
 
+  // Find a submitted photo for a given member
+  const getPhotoForMember = (member: EventMember): string | null => {
+    const photo = eventPhotos.find((p) => p.user_id === member.id);
+    return photo?.media_url ?? null;
+  };
+
+  const isCurrentUser = (member: EventMember) => 
+    isJoined && currentUserId && member.id === currentUserId;
+
+  const currentUserHasSubmitted = eventPhotos.some(
+    (p) => p.user_id === currentUserId
+  );
+
   const renderMember = (member: EventMember, style: any, index: number) => {
-    // Use a real portrait if it's one of the mock members
-    const photoUrl = index < REAL_PORTRAITS.length 
-      ? REAL_PORTRAITS[index] 
-      : (member.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.displayName}`);
+    const submittedPhoto = getPhotoForMember(member);
+
+    // Current user's slot — show camera or preview
+    if (isCurrentUser(member) && !currentUserHasSubmitted) {
+      return (
+        <View key={member.id} style={[styles.memberContainer, style]}>
+          {/* Camera: show preview if captured, live feed if not */}
+          {capturedUri ? (
+            // Preview state
+            <>
+              <Image source={{ uri: capturedUri }} style={[styles.image, capturedWithFrontCamera && styles.mirrored]} resizeMode="cover" />
+              <View style={styles.cameraOverlay}>
+                <Pressable style={styles.overlayBtnSecondary} onPress={onRetake}>
+                  <Text style={styles.overlayBtnText}>↩ Retake</Text>
+                </Pressable>
+                <Pressable 
+                  style={styles.overlayBtnPrimary} 
+                  onPress={onSubmit}
+                  disabled={isCapturing}
+                >
+                  <Text style={styles.overlayBtnPrimaryText}>
+                    {isCapturing ? "Uploading..." : "✓ Use Photo"}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : cameraPermission?.granted ? (
+            // Live camera feed
+            <>
+              <CameraView 
+                ref={cameraRef} 
+                style={styles.image} 
+                facing={facing} 
+                mirror={false} 
+              />
+              <View style={styles.cameraOverlay}>
+                <Pressable style={styles.overlayBtnSecondary} onPress={onFlip}>
+                  <Text style={styles.overlayBtnText}>🔄</Text>
+                </Pressable>
+                <Pressable 
+                  style={styles.overlayBtnPrimary} 
+                  onPress={onCapture}
+                  disabled={isCapturing}
+                >
+                  <Text style={styles.overlayBtnPrimaryText}>
+                    {isCapturing ? "..." : "📷 Capture"}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            // No permission
+            <View style={[styles.image, styles.cameraPlaceholder]}>
+              <Text style={styles.placeholderEmoji}>📷</Text>
+              <Pressable style={styles.enableBtn} onPress={onRequestPermission}>
+                <Text style={styles.enableBtnText}>Enable Camera</Text>
+              </Pressable>
+            </View>
+          )}
+          <View style={styles.nameBadge}>
+            <Text style={styles.nameText}>You</Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Other members or user who already submitted — show their photo or placeholder
+    const photoUrl = submittedPhoto
+      ?? (index < REAL_PORTRAITS.length ? REAL_PORTRAITS[index] : undefined)
+      ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.displayName}`;
 
     return (
       <View key={member.id} style={[styles.memberContainer, style]}>
@@ -39,7 +152,9 @@ export function LobbyGrid({ members, containerHeight = 400 }: LobbyGridProps) {
           resizeMode="cover"
         />
         <View style={styles.nameBadge}>
-          <Text style={styles.nameText}>{member.displayName}</Text>
+          <Text style={styles.nameText}>
+            {isCurrentUser(member) ? "You" : member.displayName}
+          </Text>
         </View>
       </View>
     );
@@ -102,18 +217,18 @@ const styles = StyleSheet.create({
   },
   nameBadge: {
     position: "absolute",
-    bottom: 12,
-    right: 12,
+    bottom: 8,
+    right: 8,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 99,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
   },
   nameText: {
     color: "#ffffff",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     textShadowColor: "rgba(0, 0, 0, 0.75)",
     textShadowOffset: { width: 1, height: 1 },
@@ -140,5 +255,64 @@ const styles = StyleSheet.create({
   },
   quadItem: {
     flex: 1,
+  },
+  // Camera overlay styles
+  cameraOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingBottom: 32,
+    paddingTop: 12,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  overlayBtnSecondary: {
+    backgroundColor: "rgba(255,255,255,0.85)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  overlayBtnPrimary: {
+    backgroundColor: "#16a34a",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  overlayBtnText: {
+    fontWeight: "700",
+    fontSize: 13,
+    color: "#1a1a2e",
+  },
+  overlayBtnPrimaryText: {
+    fontWeight: "800",
+    fontSize: 13,
+    color: "#ffffff",
+  },
+  cameraPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1a1a2e",
+  },
+  placeholderEmoji: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  enableBtn: {
+    backgroundColor: "#16a34a",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  enableBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  mirrored: {
+    transform: [{ scaleX: -1 }],
   },
 });

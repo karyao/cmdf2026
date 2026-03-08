@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectToDatabase } from "@/lib/db";
 import { Media } from "@/lib/models/Media";
+import { Event } from "@/lib/models/Event";
 
 /**
  * Uploads a base64 image to Cloudinary.
@@ -58,17 +59,22 @@ export async function GET(request: NextRequest) {
     const media = await Media.find(filter)
       .sort({ timestamp: -1 })
       .limit(60)
+      .populate("event_id", "title")
       .lean();
+
+    // Restore manual base URL prepending for local files
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
 
     return NextResponse.json({
       media: media.map((item: any) => ({
         _id: String(item._id),
-        media_url: item.media_url,
+        media_url: item.media_url.startsWith("/") ? `${baseUrl}${item.media_url}` : item.media_url,
         media_type: item.media_type,
-        thumbnail_url: item.thumbnail_url,
+        thumbnail_url: item.thumbnail_url.startsWith("/") ? `${baseUrl}${item.thumbnail_url}` : item.thumbnail_url,
         timestamp: new Date(item.timestamp).toISOString(),
         user_id: item.user_id ? String(item.user_id) : null,
-        event_id: item.event_id ? String(item.event_id) : null,
+        event_id: item.event_id?._id ? String(item.event_id._id) : (item.event_id ? String(item.event_id) : null),
+        event_title: item.event_id?.title || null,
         prompt: item.prompt,
         slot_id: item.slot_id,
         width: item.width,
@@ -177,11 +183,27 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Use authenticated user if session exists
+    console.log("DEBUG: POST /api/media body keys:", Object.keys(body));
+    if (body.userId) console.log("DEBUG: POST /api/media body.userId value:", body.userId);
+
+    // Resolve user ID
     let userId: string | null = null;
     const session = await getServerSession(authOptions);
-    if (session?.user) {
-      userId = (session.user as any).id ?? null;
+    const sessionUserId = session?.user ? (session.user as any).id : null;
+    
+    // Prioritize session user if id exists, otherwise check body/query
+    if (sessionUserId) {
+      userId = sessionUserId;
+    } else {
+      const searchParams = new URL(request.url).searchParams;
+      userId = body.userId ?? searchParams.get("userId") ?? request.headers.get("x-user-id") ?? null;
+    }
+
+    const rawEventId = body.event_id ?? body.eventId ?? body.eventID ?? null;
+    let eventId: string | null = null;
+    if (rawEventId) {
+      const s = String(rawEventId).trim();
+      if (s.length === 24) eventId = s;
     }
 
     const created = await Media.create({
@@ -190,7 +212,7 @@ export async function POST(request: NextRequest) {
       thumbnail_url: thumbnailUrl,
       timestamp: body.timestamp ? new Date(body.timestamp) : new Date(),
       user_id: userId,
-      event_id: body.event_id ?? null,
+      event_id: eventId,
       prompt: body.prompt ?? "",
       slot_id: body.slot_id ?? "",
       width,
@@ -204,19 +226,23 @@ export async function POST(request: NextRequest) {
       cloudinary_public_id: cloudinaryPublicId
     });
 
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+
     return NextResponse.json(
       {
         media: {
           _id: String(created._id),
-          media_url: created.media_url,
+          media_url: created.media_url.startsWith("/") ? `${baseUrl}${created.media_url}` : created.media_url,
           media_type: created.media_type,
-          thumbnail_url: created.thumbnail_url,
+          thumbnail_url: created.thumbnail_url.startsWith("/") ? `${baseUrl}${created.thumbnail_url}` : created.thumbnail_url,
           timestamp: new Date(created.timestamp).toISOString(),
           user_id: created.user_id ? String(created.user_id) : null,
           event_id: created.event_id ? String(created.event_id) : null,
           prompt: created.prompt,
-          caption: created.caption,
-          is_private: created.is_private
+          slot_id: created.slot_id,
+          width: created.width,
+          height: created.height,
+          mime_type: created.mime_type
         }
       },
       { status: 201 }
@@ -224,5 +250,36 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("POST /api/media failed", error);
     return NextResponse.json({ error: "Failed to save media" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    await connectToDatabase();
+    
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+
+    if (!userId) {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    // Define query: delete specific user's media
+    // If it's the demo user, also clear legacy null/orphaned entries to ensure a clean slate
+    const demoUserId = process.env.DEMO_USER_ID ?? "000000000000000000000001";
+    const deleteQuery = (userId === demoUserId) 
+      ? { $or: [{ user_id: userId }, { user_id: null }] } 
+      : { user_id: userId };
+
+    console.log("DEBUG: DELETE /api/media query:", JSON.stringify(deleteQuery));
+    const result = await Media.deleteMany(deleteQuery);
+
+    return NextResponse.json({ 
+      message: `Deleted ${result.deletedCount} items`,
+      count: result.deletedCount 
+    });
+  } catch (error) {
+    console.error("DELETE /api/media failed", error);
+    return NextResponse.json({ error: "Failed to delete media" }, { status: 500 });
   }
 }

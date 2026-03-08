@@ -1,67 +1,80 @@
 import { useEffect, useState } from "react";
-import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
 import { useEventStore } from "../store/useEventStore";
 import { AvatarStack } from "../components/AvatarStack";
-import { DEMO_USER_ID } from "../lib/api";
+import { DEMO_USER_ID, apiUrl } from "../lib/api";
 
 export function TimelineScreen() {
   const { activeEvent } = useEventStore();
   const [photos, setPhotos] = useState<any[]>([]);
 
+  const fetchPhotos = async () => { // Moved fetchPhotos outside useEffect
+    try {
+      const url = apiUrl(`/api/media?type=photo&userId=${DEMO_USER_ID}`);
+      const res = await fetch(url);
+      const data = await res.json();
+        
+      // Permissive filter: keep anything with a media_url that looks like a photo
+      const filtered = (data.media || [])
+        .filter((item: any) => {
+          const url = item.media_url || "";
+          return (url.includes("/uploads/") || url.startsWith("data:image")) && url.length > 10;
+        });
+        
+      setPhotos(filtered);
+    } catch (err) {
+      console.error("Failed to fetch photos:", err);
+    }
+  };
+
   useEffect(() => {
-    // Fetch photos from the Next.js backend
-    const fetchPhotos = async () => {
-      try {
-        const res = await fetch(`http://localhost:3000/api/media?type=photo&userId=${DEMO_USER_ID}`);
-        const data = await res.json();
-        
-        // Only keep local images (either new /uploads/ paths or old base64 strings)
-        const localOnly = (data.media || [])
-          .filter((item: any) => {
-            const url = item.media_url || "";
-            return (url.startsWith("/uploads/") || url.startsWith("data:image")) && url.length > 10;
-          })
-          .map((item: any) => ({
-            ...item,
-            media_url: item.media_url.startsWith("/uploads/") 
-              ? `http://localhost:3000${item.media_url}` 
-              : item.media_url
-          }));
-        
-        setPhotos(localOnly);
-      } catch (err) {
-        console.error("Failed to fetch photos:", err);
-      }
-    };
-    
     fetchPhotos();
     // Refresh every 5 seconds to get new photos
     const interval = setInterval(fetchPhotos, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  const handleDeleteAll = async () => {
+    try {
+      const res = await fetch(apiUrl(`/api/media?userId=${DEMO_USER_ID}`), {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setPhotos([]);
+      }
+    } catch (err) {
+      console.error("Failed to delete photos:", err);
+    }
+  };
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{activeEvent.title}</Text>
-          <Text style={styles.subtitle}>Day in the Life • {activeEvent.city}</Text>
-        </View>
+        <Text style={styles.title}>{activeEvent.title}</Text>
+        <Text style={styles.subtitle}>Day in the Life • {activeEvent.city}</Text>
 
         {/* Show real uploaded photos first */}
         {photos.length > 0 && photos.map((photo) => (
           <StickerCard key={photo._id} containerStyle={styles.cardOverride} hideTape={true}>
-            <Text style={styles.slotTime}>{new Date(photo.timestamp).toLocaleTimeString()}</Text>
-            <Text style={styles.prompt}>{photo.prompt || "Photo Upload"}</Text>
-            <Image source={{ uri: photo.media_url }} style={styles.photo} resizeMode="cover" />
+            <Text style={styles.slotTime}>{new Date(photo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+            <Text style={styles.prompt}>
+              {photo.event_title ? `[${photo.event_title}]: ` : ""}{photo.prompt || "Photo Upload"}
+            </Text>
+            <Image 
+              source={{ uri: photo.media_url }} 
+              style={[
+                styles.photo, 
+                photo.width && photo.height ? { aspectRatio: photo.width / photo.height } : {}
+              ]} 
+              resizeMode="cover" 
+            />
             <Text style={styles.meta}>Status: submitted</Text>
           </StickerCard>
         ))}
 
-        {/* Show pending/dummy slots below */}
         {activeEvent.slots.filter(s => s.status !== "submitted").map((slot) => (
           <StickerCard key={slot.id}>
             <Text style={styles.slotTime}>{new Date(slot.timestamp).toLocaleTimeString()}</Text>
@@ -71,6 +84,12 @@ export function TimelineScreen() {
             </Text>
           </StickerCard>
         ))}
+
+        {photos.length > 0 && (
+          <Pressable onPress={handleDeleteAll} style={styles.deleteButton}>
+            <Text style={styles.deleteButtonText}>Delete All Entries</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </Screen>
   );
@@ -83,7 +102,10 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 6,
-    marginBottom: 8
+    marginBottom: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   badge: {
     alignSelf: "flex-start",
@@ -101,7 +123,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7
   },
   title: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "800",
     color: theme.colors.text
   },
@@ -123,7 +145,7 @@ const styles = StyleSheet.create({
   photo: {
     marginTop: 12,
     width: "100%",
-    height: 480,
+    minHeight: 300,
     borderRadius: theme.radius.md,
     borderColor: theme.colors.text,
     borderWidth: 2,
@@ -138,6 +160,37 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     shadowOpacity: 0,
     elevation: 0,
+  },
+  deleteButton: {
+    marginTop: 40,
+    marginBottom: 60,
+    backgroundColor: "#fee2e2",
+    padding: 16,
+    borderRadius: theme.radius.lg,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#ef4444"
+  },
+  deleteButtonText: {
+    color: "#b91c1c",
+    fontWeight: "800",
+    fontSize: 16
+  },
+  debugButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: "#eee",
+    borderWidth: 1,
+    borderColor: "#ccc"
+  },
+  debugButtonActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.text
+  },
+  debugButtonText: {
+    fontSize: 10,
+    fontWeight: "bold"
   },
   unmirror: {
     transform: [{ scaleX: -1 }]
