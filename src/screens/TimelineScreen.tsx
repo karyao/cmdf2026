@@ -5,6 +5,7 @@ import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
 import { useEventStore } from "../store/useEventStore";
 import { AvatarStack } from "../components/AvatarStack";
+import { DEMO_USER_ID } from "../lib/api";
 
 export function TimelineScreen() {
   const { activeEvent } = useEventStore();
@@ -14,7 +15,7 @@ export function TimelineScreen() {
     // Fetch photos from the Next.js backend
     const fetchPhotos = async () => {
       try {
-        const res = await fetch("http://localhost:3000/api/media?type=photo");
+        const res = await fetch(`http://localhost:3000/api/media?type=photo&userId=${DEMO_USER_ID}`);
         const data = await res.json();
         
         // Only keep local images (either new /uploads/ paths or old base64 strings)
@@ -46,20 +47,16 @@ export function TimelineScreen() {
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>DAY STRIP</Text>
-          </View>
           <Text style={styles.title}>{activeEvent.title}</Text>
           <Text style={styles.subtitle}>Day in the Life • {activeEvent.city}</Text>
-          <AvatarStack members={activeEvent.members} />
         </View>
 
         {/* Show real uploaded photos first */}
         {photos.length > 0 && photos.map((photo) => (
-          <StickerCard key={photo._id}>
+          <StickerCard key={photo._id} containerStyle={styles.cardOverride} hideTape={true}>
             <Text style={styles.slotTime}>{new Date(photo.timestamp).toLocaleTimeString()}</Text>
             <Text style={styles.prompt}>{photo.prompt || "Photo Upload"}</Text>
-            <Image source={{ uri: photo.media_url }} style={[styles.photo, styles.unmirror]} />
+            <Image source={{ uri: photo.media_url }} style={styles.photo} resizeMode="cover" />
             <Text style={styles.meta}>Status: submitted</Text>
           </StickerCard>
         ))}
@@ -81,8 +78,8 @@ export function TimelineScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    padding: 16,
-    gap: 14
+    padding: 12,
+    gap: 20
   },
   header: {
     gap: 6,
@@ -124,12 +121,23 @@ const styles = StyleSheet.create({
     color: theme.colors.text
   },
   photo: {
-    marginTop: 10,
+    marginTop: 12,
     width: "100%",
-    height: 220,
-    borderRadius: theme.radius.lg,
-    borderColor: theme.colors.border,
-    borderWidth: 2
+    height: 480,
+    borderRadius: theme.radius.md,
+    borderColor: theme.colors.text,
+    borderWidth: 2,
+    backgroundColor: theme.colors.surface,
+  },
+  cardOverride: {
+    padding: 0,
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 0,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   unmirror: {
     transform: [{ scaleX: -1 }]

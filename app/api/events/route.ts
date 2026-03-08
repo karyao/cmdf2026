@@ -23,6 +23,32 @@ async function ensureSeedEvents() {
       intervalMinutes: 60,
       createdBy: ALT_DEMO_USER_OBJECT_ID,
       members: [ALT_DEMO_USER_OBJECT_ID]
+    },
+    {
+      title: "4-Person Focus Group",
+      city: "Burnaby",
+      intervalMinutes: 45,
+      createdBy: DEMO_USER_OBJECT_ID,
+      members: [
+        DEMO_USER_OBJECT_ID, 
+        "000000000000000000000003", 
+        "000000000000000000000004", 
+        "000000000000000000000005"
+      ]
+    },
+    {
+      title: "Morning Coffee Duo",
+      city: "Richmond",
+      intervalMinutes: 120,
+      createdBy: DEMO_USER_OBJECT_ID,
+      members: [DEMO_USER_OBJECT_ID, "000000000000000000000006"]
+    },
+    {
+      title: "Hiking Trio",
+      city: "North Vancouver",
+      intervalMinutes: 240,
+      createdBy: DEMO_USER_OBJECT_ID,
+      members: [DEMO_USER_OBJECT_ID, "000000000000000000000007", "000000000000000000000008"]
     }
   ];
 

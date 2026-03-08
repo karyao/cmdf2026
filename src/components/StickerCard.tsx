@@ -1,13 +1,22 @@
 import { PropsWithChildren } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, ViewStyle } from "react-native";
 import { theme } from "../theme/theme";
 
-export function StickerCard({ children }: PropsWithChildren) {
+interface StickerCardProps extends PropsWithChildren {
+  containerStyle?: ViewStyle;
+  hideTape?: boolean;
+}
+
+export function StickerCard({ children, containerStyle, hideTape }: StickerCardProps) {
   return (
     <View style={styles.wrap}>
-      <View style={[styles.tape, styles.tapeLeft]} />
-      <View style={[styles.tape, styles.tapeRight]} />
-      <View style={styles.card}>{children}</View>
+      {!hideTape && (
+        <>
+          <View style={[styles.tape, styles.tapeLeft]} />
+          <View style={[styles.tape, styles.tapeRight]} />
+        </>
+      )}
+      <View style={[styles.card, containerStyle]}>{children}</View>
     </View>
   );
 }

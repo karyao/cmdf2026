@@ -4,6 +4,8 @@ import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
 import { theme } from "../theme/theme";
 import { apiUrl, DEMO_USER_ID } from "../lib/api";
+import { LobbyGrid } from "../components/LobbyGrid";
+import { EventMember } from "../types/domain";
 
 interface LobbyEvent {
   _id: string;
@@ -12,6 +14,7 @@ interface LobbyEvent {
   intervalMinutes: number;
   joined: boolean;
   memberCount: number;
+  members: string[];
 }
 
 export function LobbyScreen() {
@@ -20,6 +23,7 @@ export function LobbyScreen() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
+  const [testMemberCount, setTestMemberCount] = useState<number | null>(null);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -55,6 +59,23 @@ export function LobbyScreen() {
     () => events.find((event) => event._id === activeEventId) ?? null,
     [events, activeEventId]
   );
+
+  const activeMembers = useMemo((): EventMember[] => {
+    if (!activeEvent) return [];
+    
+    // Use testMemberCount if set, otherwise use real member count
+    const count = testMemberCount ?? (activeEvent.members || []).length;
+    
+    // If the API doesn't return full objects, mock some for the demo
+    return Array.from({ length: Math.max(count, 1) }).map((_, index) => {
+      const id = activeEvent.members[index] || `mock-${index}`;
+      return {
+        id,
+        displayName: id === DEMO_USER_ID ? "You (Karen)" : `Member ${index + 1}`,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`
+      };
+    });
+  }, [activeEvent, testMemberCount]);
 
   const toggleMembership = useCallback(async (event: LobbyEvent) => {
     if (updatingId) return;
@@ -152,13 +173,33 @@ export function LobbyScreen() {
         </View>
       </ScrollView>
 
-      <Modal visible={Boolean(activeEvent)} transparent animationType="fade" onRequestClose={() => setActiveEventId(null)}>
+      <Modal 
+        visible={Boolean(activeEvent)} 
+        transparent 
+        animationType="fade" 
+        onRequestClose={() => {
+          setActiveEventId(null);
+          setTestMemberCount(null);
+        }}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             {activeEvent ? (
               <>
                 <Text style={styles.modalTitle}>{activeEvent.title}</Text>
                 <Text style={styles.meta}>{activeEvent.city} • Every {activeEvent.intervalMinutes} min</Text>
+                
+                <View style={styles.gridWrapper}>
+                  <LobbyGrid members={activeMembers} containerHeight={280} />
+                </View>
+
+                <Pressable 
+                  onPress={() => setTestMemberCount(prev => ((prev ?? activeMembers.length) % 4) + 1)}
+                  style={styles.testButton}
+                >
+                  <Text style={styles.testButtonText}>🧪 Cycle Layout: {activeMembers.length} People</Text>
+                </Pressable>
+
                 <Text style={styles.modalBody}>{activeEvent.memberCount} people joined this event.</Text>
                 <Text style={styles.modalBody}>
                   Status: {activeEvent.joined ? "Joined" : "Not joined"}
@@ -177,7 +218,13 @@ export function LobbyScreen() {
                 </Pressable>
               </>
             ) : null}
-            <Pressable onPress={() => setActiveEventId(null)} style={[styles.button, styles.closeButton]}>
+            <Pressable 
+              onPress={() => {
+                setActiveEventId(null);
+                setTestMemberCount(null);
+              }} 
+              style={[styles.button, styles.closeButton]}
+            >
               <Text style={styles.buttonText}>Close</Text>
             </Pressable>
           </View>
@@ -338,5 +385,23 @@ const styles = StyleSheet.create({
   noticeBody: {
     marginTop: 4,
     color: theme.colors.mutedText
+  },
+  gridWrapper: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  testButton: {
+    backgroundColor: "#fef3c7",
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+    alignSelf: "center",
+    marginBottom: 8,
+  },
+  testButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#b45309",
   }
 });

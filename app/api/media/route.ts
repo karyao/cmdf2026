@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const eventId = searchParams.get("eventId");
     const mediaType = searchParams.get("type");
+    const userId = searchParams.get("userId");
 
     const filter: Record<string, unknown> = {};
     if (eventId) {
@@ -43,6 +44,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Invalid eventId format" }, { status: 400 });
       }
       filter.event_id = eventId;
+    }
+    if (userId) {
+      if (!/^[0-9a-fA-F]{24}$/.test(userId)) {
+        // Fallback for demo IDs which might not be valid ObjectIds
+        filter.user_id = userId;
+      } else {
+        filter.user_id = userId;
+      }
     }
     if (mediaType) filter.media_type = mediaType;
 
