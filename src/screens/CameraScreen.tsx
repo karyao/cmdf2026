@@ -11,6 +11,7 @@ export function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>("back");
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
+  const [capturedWithFrontCamera, setCapturedWithFrontCamera] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const openSlot = activeEvent.slots.find((slot) => slot.status === "window_open");
   const latestSubmitted = useMemo(
@@ -30,6 +31,7 @@ export function CameraScreen() {
         mirror: false
       });
       setCapturedUri(result.uri);
+      setCapturedWithFrontCamera(facing === "front");
     } finally {
       setIsCapturing(false);
     }
@@ -37,13 +39,15 @@ export function CameraScreen() {
 
   const submitPhoto = () => {
     if (!openSlot || !capturedUri) return;
-    markSlot(openSlot.id, "submitted", capturedUri);
+    markSlot(openSlot.id, "submitted", capturedUri, capturedWithFrontCamera);
     setCapturedUri(null);
+    setCapturedWithFrontCamera(false);
   };
 
   const skipSlot = () => {
     if (!openSlot) return;
     setCapturedUri(null);
+    setCapturedWithFrontCamera(false);
     markSlot(openSlot.id, "skipped_private");
   };
 
@@ -60,6 +64,45 @@ export function CameraScreen() {
         <Text style={styles.title}>Camera Module</Text>
         <Text style={styles.subtitle}>Take a photo, preview it, and choose to retake or submit.</Text>
 
+        {openSlot ? (
+          <View style={styles.actions}>
+            {permission?.granted ? (
+              <>
+                <Pressable style={[styles.button, styles.secondary]} onPress={toggleCameraFacing}>
+                  <Text style={styles.secondaryText}>Flip Camera</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.button, styles.secondary, !capturedUri && styles.disabledButton]}
+                  onPress={() => {
+                    setCapturedUri(null);
+                    setCapturedWithFrontCamera(false);
+                  }}
+                  disabled={!capturedUri}
+                >
+                  <Text style={[styles.secondaryText, !capturedUri && styles.disabledText]}>Take Another Photo</Text>
+                </Pressable>
+                <Pressable style={[styles.button, styles.primary]} onPress={takePhoto} disabled={isCapturing || !!capturedUri}>
+                  <Text style={styles.primaryText}>{isCapturing ? "Capturing..." : "Take Photo"}</Text>
+                </Pressable>
+                <Pressable style={[styles.button, styles.primary]} onPress={submitPhoto} disabled={!capturedUri}>
+                  <Text style={styles.primaryText}>Use Photo</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable style={[styles.button, styles.primary]} onPress={requestPermission}>
+                  <Text style={styles.primaryText}>Enable Camera</Text>
+                </Pressable>
+              </>
+            )}
+            <Pressable style={[styles.button, styles.warning]} onPress={skipSlot}>
+              <Text style={styles.warningText}>Skip / Sensitive</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Text style={styles.meta}>No active capture window right now.</Text>
+        )}
+
         {!permission ? (
           <View style={styles.preview}>
             <Text style={styles.previewText}>Checking camera permissions…</Text>
@@ -73,46 +116,20 @@ export function CameraScreen() {
           </View>
         ) : capturedUri ? (
           <View style={styles.preview}>
-            <Image source={{ uri: capturedUri }} style={styles.previewImage} />
+            <Image source={{ uri: capturedUri }} style={[styles.previewImage, styles.unmirror]} />
           </View>
         ) : (
           <View style={styles.preview}>
             <CameraView ref={cameraRef} style={styles.cameraView} facing={facing} mirror={false} />
           </View>
         )}
-
-        {openSlot ? (
-          <View style={styles.actions}>
-            {permission?.granted && !capturedUri ? (
-              <>
-                <Pressable style={[styles.button, styles.secondary]} onPress={toggleCameraFacing}>
-                  <Text style={styles.secondaryText}>Flip Camera</Text>
-                </Pressable>
-                <Pressable style={[styles.button, styles.primary]} onPress={takePhoto} disabled={isCapturing}>
-                  <Text style={styles.primaryText}>{isCapturing ? "Capturing..." : "Take Photo"}</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Pressable style={[styles.button, styles.secondary]} onPress={() => setCapturedUri(null)}>
-                  <Text style={styles.secondaryText}>Take Another</Text>
-                </Pressable>
-                <Pressable style={[styles.button, styles.primary]} onPress={submitPhoto}>
-                  <Text style={styles.primaryText}>Use Photo</Text>
-                </Pressable>
-              </>
-            )}
-            <Pressable style={[styles.button, styles.warning]} onPress={skipSlot}>
-              <Text style={styles.warningText}>Skip / Sensitive</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Text style={styles.meta}>No active capture window right now.</Text>
-        )}
         {latestSubmitted?.imageUrl ? (
           <View style={styles.latestWrap}>
             <Text style={styles.latestTitle}>Latest submitted photo</Text>
-            <Image source={{ uri: latestSubmitted.imageUrl }} style={styles.latestImage} />
+            <Image
+              source={{ uri: latestSubmitted.imageUrl }}
+              style={[styles.latestImage, styles.unmirror]}
+            />
           </View>
         ) : null}
       </View>
@@ -177,7 +194,8 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 10,
-    marginTop: 16,
+    marginTop: 12,
+    marginBottom: 12,
     flexWrap: "wrap",
     flexDirection: "row"
   },
@@ -218,6 +236,12 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontWeight: "700"
   },
+  disabledButton: {
+    opacity: 0.5
+  },
+  disabledText: {
+    color: theme.colors.mutedText
+  },
   meta: {
     marginTop: 14,
     color: theme.colors.mutedText
@@ -236,5 +260,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderColor: theme.colors.border,
     borderWidth: 2
+  },
+  unmirror: {
+    transform: [{ scaleX: -1 }]
   }
 });

@@ -24,7 +24,9 @@ export function TimelineScreen() {
           <StickerCard key={slot.id}>
             <Text style={styles.slotTime}>{new Date(slot.timestamp).toLocaleTimeString()}</Text>
             <Text style={styles.prompt}>{slot.promptText}</Text>
-            {slot.imageUrl ? <Image source={{ uri: slot.imageUrl }} style={styles.photo} /> : null}
+            {slot.imageUrl ? (
+              <Image source={{ uri: slot.imageUrl }} style={[styles.photo, styles.unmirror]} />
+            ) : null}
             <Text style={styles.meta}>
               Status: {slot.status} {slot.promptType === "creative_hint" ? "• Creative Hint" : ""}
             </Text>
@@ -86,6 +88,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderColor: theme.colors.border,
     borderWidth: 2
+  },
+  unmirror: {
+    transform: [{ scaleX: -1 }]
   },
   meta: {
     marginTop: 8,

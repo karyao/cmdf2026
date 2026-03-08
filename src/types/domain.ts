@@ -15,6 +15,7 @@ export interface PromptSlot {
   promptText: string;
   promptType: PromptType;
   imageUrl?: string;
+  capturedWithFrontCamera?: boolean;
   gifUrl?: string;
   isLate?: boolean;
   isPrivate?: boolean;
@@ -36,4 +37,3 @@ export interface SocialEvent {
   slots: PromptSlot[];
   summary?: EventSummary;
 }
-

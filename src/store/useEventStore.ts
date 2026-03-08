@@ -6,7 +6,7 @@ interface EventState {
   activeEvent: SocialEvent;
   windowClosesAt?: string;
   openCaptureWindow: (timestamp: string, windowMinutes: number) => void;
-  markSlot: (slotId: string, status: SlotStatus, imageUrl?: string) => void;
+  markSlot: (slotId: string, status: SlotStatus, imageUrl?: string, capturedWithFrontCamera?: boolean) => void;
   applyAntiRepetitionPrompt: (slotId: string) => void;
 }
 
@@ -51,12 +51,12 @@ export const useEventStore = create<EventState>((set) => ({
       }
     }));
   },
-  markSlot: (slotId, status, imageUrl) => {
+  markSlot: (slotId, status, imageUrl, capturedWithFrontCamera) => {
     set((state) => ({
       activeEvent: {
         ...state.activeEvent,
         slots: state.activeEvent.slots.map((slot) =>
-          slot.id === slotId ? { ...slot, status, imageUrl } : slot
+          slot.id === slotId ? { ...slot, status, imageUrl, capturedWithFrontCamera } : slot
         )
       }
     }));
