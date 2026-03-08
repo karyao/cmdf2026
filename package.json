@@ -4,6 +4,9 @@
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start:next": "next start",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

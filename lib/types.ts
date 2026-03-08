@@ -32,5 +32,7 @@ export interface EventRecord {
   intervalMinutes: number;
   createdBy: string;
   members: string[];
+  memberCount?: number;
+  joined?: boolean;
   createdAt: string;
 }
