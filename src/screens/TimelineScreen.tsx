@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../components/Screen";
 import { StickerCard } from "../components/StickerCard";
@@ -7,6 +8,31 @@ import { AvatarStack } from "../components/AvatarStack";
 
 export function TimelineScreen() {
   const { activeEvent } = useEventStore();
+  const [photos, setPhotos] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Fetch photos from the Next.js backend
+    const fetchPhotos = async () => {
+      try {
+        const res = await fetch("http://localhost:3000/api/media?type=photo");
+        const data = await res.json();
+        
+        // Only keep local base64 images (ignore Cloudinary URLs and broken tiny tests)
+        const localOnly = (data.media || []).filter((item: any) => 
+          item.media_url?.startsWith("data:image") && item.media_url.length > 100
+        );
+        
+        setPhotos(localOnly);
+      } catch (err) {
+        console.error("Failed to fetch photos:", err);
+      }
+    };
+    
+    fetchPhotos();
+    // Refresh every 5 seconds to get new photos
+    const interval = setInterval(fetchPhotos, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <Screen>
@@ -20,13 +46,21 @@ export function TimelineScreen() {
           <AvatarStack members={activeEvent.members} />
         </View>
 
-        {activeEvent.slots.map((slot) => (
+        {/* Show real uploaded photos first */}
+        {photos.length > 0 && photos.map((photo) => (
+          <StickerCard key={photo._id}>
+            <Text style={styles.slotTime}>{new Date(photo.timestamp).toLocaleTimeString()}</Text>
+            <Text style={styles.prompt}>{photo.prompt || "Photo Upload"}</Text>
+            <Image source={{ uri: photo.media_url }} style={[styles.photo, styles.unmirror]} />
+            <Text style={styles.meta}>Status: submitted</Text>
+          </StickerCard>
+        ))}
+
+        {/* Show pending/dummy slots below */}
+        {activeEvent.slots.filter(s => s.status !== "submitted").map((slot) => (
           <StickerCard key={slot.id}>
             <Text style={styles.slotTime}>{new Date(slot.timestamp).toLocaleTimeString()}</Text>
             <Text style={styles.prompt}>{slot.promptText}</Text>
-            {slot.imageUrl ? (
-              <Image source={{ uri: slot.imageUrl }} style={[styles.photo, styles.unmirror]} />
-            ) : null}
             <Text style={styles.meta}>
               Status: {slot.status} {slot.promptType === "creative_hint" ? "• Creative Hint" : ""}
             </Text>

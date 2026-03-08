@@ -5,8 +5,8 @@ import { connectToDatabase } from "@/lib/db";
 import { Media } from "@/lib/models/Media";
 
 /**
- * Uploads a base64 image to Cloudinary if configured.
- * Returns the upload result, or null if Cloudinary is not available.
+ * Uploads a base64 image to Cloudinary.
+ * Only called when useCloud: true is passed in the request.
  */
 async function uploadToCloudinary(imageData: string) {
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
@@ -95,17 +95,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid image payload" }, { status: 400 });
       }
 
-      const uploaded = await uploadToCloudinary(body.imageData);
-
-      if (uploaded) {
-        mediaUrl = uploaded.secure_url;
-        thumbnailUrl = uploaded.secure_url.replace("/upload/", "/upload/w_400,c_scale/");
-        cloudinaryPublicId = uploaded.public_id;
-        mimeType = `image/${uploaded.format}`;
-        width = uploaded.width;
-        height = uploaded.height;
+      // Local-first: store data URL in MongoDB by default.
+      // Only upload to Cloudinary when explicitly requested with useCloud: true
+      if (body.useCloud) {
+        const uploaded = await uploadToCloudinary(body.imageData);
+        if (uploaded) {
+          mediaUrl = uploaded.secure_url;
+          thumbnailUrl = uploaded.secure_url.replace("/upload/", "/upload/w_400,c_scale/");
+          cloudinaryPublicId = uploaded.public_id;
+          mimeType = `image/${uploaded.format}`;
+          width = uploaded.width;
+          height = uploaded.height;
+        } else {
+          mediaUrl = body.imageData;
+          mimeType = "image/jpeg";
+        }
       } else {
-        // No Cloudinary configured — store data URL directly (dev only)
+        // Default: store the base64 data URL directly in MongoDB
         mediaUrl = body.imageData;
         mimeType = "image/jpeg";
       }
