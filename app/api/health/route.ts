@@ -3,16 +3,18 @@ import { connectToDatabase } from "@/lib/db";
 import { User } from "@/lib/models/User";
 import { Event } from "@/lib/models/Event";
 import { Photo } from "@/lib/models/Photo";
+import { Media } from "@/lib/models/Media";
 
 export async function GET() {
   try {
     const conn = await connectToDatabase();
 
     // Get collection counts to verify the connection works
-    const [userCount, eventCount, photoCount] = await Promise.all([
+    const [userCount, eventCount, photoCount, mediaCount] = await Promise.all([
       User.countDocuments(),
       Event.countDocuments(),
-      Photo.countDocuments()
+      Photo.countDocuments(),
+      Media.countDocuments()
     ]);
 
     return NextResponse.json({
@@ -22,7 +24,8 @@ export async function GET() {
       collections: {
         users: userCount,
         events: eventCount,
-        photos: photoCount
+        photos: photoCount,
+        media: mediaCount
       },
       timestamp: new Date().toISOString()
     });
