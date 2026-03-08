@@ -6,6 +6,10 @@ const eventSchema = new Schema(
     type: { type: String, enum: ["public", "private"], default: "public" },
     city: { type: String, default: "" },
     intervalMinutes: { type: Number, default: 60 },
+    maxPeople: { type: Number, default: 10 },
+    startTime: { type: Date },
+    prompts: [{ type: String }],
+    joinCode: { type: String, unique: true, sparse: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     members: [{ type: Schema.Types.ObjectId, ref: "User" }]
   },

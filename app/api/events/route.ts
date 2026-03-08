@@ -4,6 +4,9 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectToDatabase } from "@/lib/db";
 import { Event } from "@/lib/models/Event";
 import { buildCorsHeaders } from "@/lib/cors";
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({});
 
 const DEMO_USER_OBJECT_ID = process.env.DEMO_USER_ID ?? "000000000000000000000001";
 const ALT_DEMO_USER_OBJECT_ID = "000000000000000000000002";
@@ -91,6 +94,15 @@ async function resolveUserId(request: NextRequest, bodyUserId?: string) {
   return toUserId(bodyUserId ?? fromQuery ?? fromHeader);
 }
 
+function generateJoinCode() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
@@ -100,7 +112,9 @@ export async function GET(request: NextRequest) {
 
     const filter =
       scope === "all"
-        ? { type: "public" }
+        ? {
+            $or: [{ type: "public" }, { createdBy: userId }, { members: userId }]
+          }
         : {
             $or: [{ createdBy: userId }, { members: userId }]
           };
@@ -119,6 +133,10 @@ export async function GET(request: NextRequest) {
             type: event.type,
             city: event.city,
             intervalMinutes: event.intervalMinutes,
+            maxPeople: event.maxPeople,
+            startTime: event.startTime ? new Date(event.startTime).toISOString() : undefined,
+            prompts: event.prompts ?? [],
+            joinCode: (event.type === "private" && String(event.createdBy) === userId) ? event.joinCode : undefined,
             createdBy: String(event.createdBy),
             members,
             memberCount: members.length,
@@ -146,11 +164,49 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
+    const isPrivate = body.type === "private";
+    const joinCode = isPrivate ? generateJoinCode() : undefined;
+    
+    // Enforce max 4 people
+    const maxPeople = Math.min(body.maxPeople ? parseInt(body.maxPeople, 10) : 4, 4);
+    
+    // Handle prompts padding
+    let initialPrompts = body.prompts ?? [];
+    if (initialPrompts.length === 0) {
+      initialPrompts = ["Take a selfie", "Show your current view"];
+    }
+
+    let finalPrompts = [...initialPrompts];
+
+    if (finalPrompts.length < 12) {
+      try {
+        const numToGenerate = 12 - finalPrompts.length;
+        const promptString = finalPrompts.join(", ");
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: `Generate ${numToGenerate} short, fun, engaging photo prompts for a social event. They should match the vibe of these existing prompts: [${promptString}]. Only return the prompts separated by the pipe character '|' with no numbers, bullet points, or extra text. Example: Find a dog|Take a picture of the sky|Show your shoes`
+        });
+
+        if (response.text) {
+          const generated = response.text.split('|').map(p => p.trim()).filter(Boolean);
+          finalPrompts = [...finalPrompts, ...generated].slice(0, 12);
+        }
+      } catch (aiError) {
+        console.error("Failed to generate additional prompts:", aiError);
+        // non-fatal, just proceed with whatever prompts we have
+      }
+    }
+
     const created = await Event.create({
       title: body.title,
       type: body.type ?? "public",
       city: body.city ?? "",
       intervalMinutes: body.intervalMinutes ?? 60,
+      maxPeople: maxPeople,
+      startTime: body.startTime ? new Date(body.startTime) : undefined,
+      prompts: finalPrompts,
+      joinCode,
       createdBy: userId,
       members: [userId] // creator is automatically a member
     });
@@ -163,6 +219,10 @@ export async function POST(request: NextRequest) {
           type: created.type,
           city: created.city,
           intervalMinutes: created.intervalMinutes,
+          maxPeople: created.maxPeople,
+          startTime: created.startTime ? new Date(created.startTime).toISOString() : undefined,
+          prompts: created.prompts ?? [],
+          joinCode: created.joinCode,
           createdBy: String(created.createdBy),
           members: created.members.map(String),
           memberCount: created.members.length,
