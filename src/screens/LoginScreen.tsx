@@ -38,18 +38,19 @@ export function LoginScreen({ navigation }: LoginScreenProps) {
         <Text style={styles.label}>Email</Text>
         <TextInput
           style={styles.input}
-          placeholder="demo@test.com"
+          placeholder="Enter your email"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
+          autoComplete="email"
           placeholderTextColor="#999"
         />
 
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.input}
-          placeholder="password"
+          placeholder="Enter your password"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
